@@ -101,4 +101,6 @@ sudo sshd -t
 If there's no output, config is good
 
 ## Restart SSH service
+```bash
 sudo systemctl restart ssh
+```
