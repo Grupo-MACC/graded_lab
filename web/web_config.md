@@ -128,6 +128,7 @@ EXIT;
 nano /var/www/web/airport_web/db_connection.php
 ```
 
+Cambiar el usuario en el codigo a un usuario dedicado
 ```php
 $dbuser = "webuser";
 $dbpass = "webpass";
@@ -156,6 +157,10 @@ Desde el router MikroTik (RouterOS):
 
 ```rsc
 /tool fetch url="http://192.168.10.2"
+[admin@NAC] > /tool fetch url="https://192.168.10.2:8443" 
+    status: finished
+    downloaded: 2KiBC-z pause
+    duration: 1s
 ```
 
 Comprobar recursos estáticos:
