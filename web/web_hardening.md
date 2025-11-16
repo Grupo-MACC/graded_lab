@@ -164,3 +164,116 @@ Desde RouterOS (MikroTik):
 
 ```
 ```
+
+# Hardening y Seguridad del Servidor Web con Nginx y Linux
+
+Este documento complementa la configuración SSL previa e incluye medidas de **hardening del sistema operativo**, **protección de archivos**, **Fail2ban** y **ajustes de seguridad del kernel**.
+
+---
+
+## 1. Asegurar Permisos en Archivos del Sistema
+
+### 1.1 Proteger Configuración de Nginx
+
+Aseguramos que solo el usuario `root` pueda modificar la configuración.
+
+```bash
+chown -R root:root /etc/nginx
+find /etc/nginx -type d -exec chmod 755 {} \;
+find /etc/nginx -type f -exec chmod 644 {} \;
+```
+
+**Explicación:**
+
+* Directorios: ejecutables y legibles (755)
+* Archivos: solo root escribe; todos leen (644)
+
+---
+
+### 1.2 Proteger Archivos de la Web
+
+Asignamos los archivos al usuario de servicio (`www-data`).
+
+```bash
+chown -R www-data:www-data /var/www/html
+find /var/www/html -type d -exec chmod 755 {} \;
+find /var/www/html -type f -exec chmod 644 {} \;
+```
+
+*Si tu web está en `/var/www/web/airport_web`, reemplázalo en los comandos.*
+
+---
+
+## 2. Instalar Defensa Proactiva con Fail2ban
+
+Fail2ban bloquea automáticamente IPs que presentan actividad sospechosa.
+
+```bash
+apt install fail2ban -y
+systemctl enable fail2ban
+systemctl start fail2ban
+```
+
+Opcional: editar configuración en `/etc/fail2ban/jail.local`.
+
+---
+
+## 3. Hardening del Kernel (sysctl)
+
+Creamos archivo dedicado para endurecimiento del sistema.
+
+```bash
+nano /etc/sysctl.d/hardening.conf
+```
+
+Agregar:
+
+```bash
+# --- Hardening de Red ---
+net.ipv4.tcp_syncookies = 1
+net.ipv4.conf.all.rp_filter = 1
+net.ipv4.conf.default.rp_filter = 1
+net.ipv4.conf.all.accept_redirects = 0
+net.ipv6.conf.all.accept_redirects = 0
+net.ipv4.conf.all.secure_redirects = 0
+```
+
+Aplicar cambios:
+
+```bash
+sysctl -p
+```
+
+---
+
+## 4. Asegurar Clave Privada del Certificado SSL
+
+```bash
+chmod 400 /etc/ssl/private/nginx-selfsigned.key
+```
+
+La clave queda accesible solo para root.
+
+---
+
+## 5. Proteger el PID de Nginx
+
+```bash
+chown root:root /var/run/nginx.pid
+chmod 644 /var/run/nginx.pid
+```
+
+Esto evita manipulaciones del proceso.
+
+---
+
+## ✅ Resumen
+
+Medidas aplicadas:
+
+* Permisos estrictos en `/etc/nginx` y archivos web.
+* Fail2ban instalado y activo.
+* Kernel reforzado con sysctl.
+* Certificados SSL y PID protegidos.
+
+Este hardening mejora la seguridad general del servidor web y reduce la superficie de ataque.
