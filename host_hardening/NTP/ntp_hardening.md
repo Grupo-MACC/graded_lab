@@ -10,9 +10,8 @@ apt install ntp -y
 ```
 Verify installation:
 ```bash
-systemctl enable ntpsec-wait.service
-systemctl start ntpd
-systemctl status ntpd
+systemctl start ntpsec
+systemctl status ntpsec
 ```
 
 ## 2. Configure AAA as the NTP Server
@@ -49,6 +48,7 @@ fudge 127.127.1.0 stratum 10
 
 # Bind only trusted interfaces
 interface ignore wildcard
+interface ignore ipv6
 interface listen enp0s3
 interface listen lo
 
@@ -59,6 +59,12 @@ filegen loopstats file loopstats type day enable
 filegen peerstats file peerstats type day enable
 filegen clockstats file clockstats type day enable
 logfile /var/log/ntp.log
+```
+Create logs directory
+```bash
+mkdir -p /var/log/ntpsec
+chown ntpsec:ntpsec /var/log/ntpsec
+chmod 700 /var/log/ntpsec
 ```
 Restart NTPsec to apply:
 ```bash
@@ -80,18 +86,94 @@ systemctl status ntpd
 - Remote monitor mode is disabled to reduce attack surface.
 
 ## 3. Configure Debian Hosts as NTP Clients
-Edit the NTPsec configuration:
+### 3.1 Edit the NTPsec configuration:
+Edit /etc/ntpsec/ntp.conf:
 ```bash
 nano /etc/ntpsec/ntp.conf
 ```
 Paste the hardened server configuration (example below):
 ```ini
-# Internal NTP server only
-server 192.168.1.1 iburst
+# /etc/ntpsec/ntp.conf, configuration for ntpd; see ntp.conf(5) for help
 
-# Default restrictions
+driftfile /var/lib/ntpsec/ntp.drift
+leapfile /usr/share/zoneinfo/leap-seconds.list
+
+# To enable Network Time Security support as a server, obtain a certificate
+# (e.g. with Let's Encrypt), configure the paths below, and uncomment:
+# nts cert CERT_FILE
+# nts key KEY_FILE
+# nts enable
+
+# You must create /var/log/ntpsec (owned by ntpsec:ntpsec) to enable logging.
+#statsdir /var/log/ntpsec/
+#statistics loopstats peerstats clockstats
+#filegen loopstats file loopstats type day enable
+#filegen peerstats file peerstats type day enable
+#filegen clockstats file clockstats type day enable
+
+# This should be maxclock 7, but the pool entries count towards maxclock.
+tos maxclock 11
+
+# Comment this out if you have a refclock and want it to be able to discipline
+# the clock by itself (e.g. if the system is not connected to the network).
+tos minclock 4 minsane 3
+
+# Specify one or more NTP servers.
+
+# Public NTP servers supporting Network Time Security:
+# server time.cloudflare.com nts
+
+# pool.ntp.org maps to about 1000 low-stratum NTP servers.  Your server will
+# pick a different set every time it starts up.  Please consider joining the
+# pool: <https://www.pool.ntp.org/join.html>
+server 192.168.1.1 iburst prefer
+
+# Access control configuration; see /usr/share/doc/ntpsec-doc/html/accopt.html
+# for details.
+#
+# Note that "restrict" applies to both servers and clients, so a configuration
+# that might be intended to block requests from certain clients could also end
+# up blocking replies from your own upstream servers.
+
+# By default, exchange time with everybody, but don't allow configuration.
 restrict default kod nomodify notrap nopeer noquery
-restrict 127.0.0.1
+
+# Local users may interrogate the ntp server more closely.
+restrict 127.0.0.1 nomodify notrap nopeer
+restrict ::1
+
+interface ignore wildcard
+interface ignore ipv6
+interface listen lo
+interface listen enp0s3
+```
+Create logs directory
+```bash
+mkdir -p /var/log/ntpsec
+chown ntpsec:ntpsec /var/log/ntpsec
+chmod 700 /var/log/ntpsec
+```
+Restart NTPsec to apply:
+```bash
+systemctl restart ntpsec
+systemctl status ntpsec
+```
+### 3.2 Enable NTPsec to start after the network is up
+Create a systemd override so that ntpsec starts after the network is online:
+```bash
+systemctl edit ntpsec
+```
+Add the following
+```bash
+[Unit]
+After=network-online.target
+Wants=network-online.target
+```
+Then reload systemd and enable the service:
+```bash
+systemctl daemon-reexec
+systemctl enable ntpsec
+systemctl start ntpsec
 ```
 ### Client hardening highlights
 
@@ -114,3 +196,21 @@ On Mikrotik router:
 - Prevents router from acting as NTP server.
 
 - Keeps all devices in LAN aligned with the same time source.
+
+## 5. Verify NTP Synchronization on Debian VM
+Once the NTP server and clients are configured, verify that clients are correctly syncing with the AAA server.
+### 5.1 Check NTP Status on the Client
+On each Debian client, run:
+```bash
+# Check NTPsec daemon status
+systemctl status ntpsec
+
+# Check peers and synchronization status
+ntpq -p
+```
+Expected output:
+```markdown
+     remote           refid      st t when poll reach   delay   offset  jitter
+==========================================================================
+192.168.1.1       .AAA.         2 u   10   64   377   0.123   0.045   0.010
+```
