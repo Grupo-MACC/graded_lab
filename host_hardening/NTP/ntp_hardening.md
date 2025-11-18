@@ -38,6 +38,7 @@ restrict 192.168.1.0 mask 255.255.255.0 nomodify notrap noquery
 restrict 192.168.10.0 mask 255.255.255.0 nomodify notrap noquery
 restrict 10.1.1.0 mask 255.255.255.0 nomodify notrap noquery
 restrict 10.1.2.0 mask 255.255.255.0 nomodify notrap noquery
+restrict 10.0.2.0 mask 255.255.255.0 nomodify notrap noquery
 restrict 127.0.0.1
 
 disable monitor
@@ -138,7 +139,6 @@ server 192.168.1.1 iburst prefer
 # By default, exchange time with everybody, but don't allow configuration.
 restrict default kod nomodify notrap nopeer noquery
 
-# Local users may interrogate the ntp server more closely.
 restrict 127.0.0.1 nomodify notrap nopeer
 restrict ::1
 
