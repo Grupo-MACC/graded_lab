@@ -43,6 +43,7 @@ Two keys must be uploaded to the router:
 |--------|---------|
 | `router_id_rsa.pub` | Public key to authenticate into the router |
 | `internal_debian_key` | Private key the router will use to authenticate into Debian VM |
+
 Upload these two files to the MikroTik using SCP.
 ### 2.1 Import the Key Used to Log Into the Router
 ```bash
