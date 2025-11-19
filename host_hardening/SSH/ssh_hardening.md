@@ -2,69 +2,75 @@
 
 This guide covers:
 
-- Install sudo
-- Add user with individual sudo privileges
-- Create SSH key & deploy to server
-- Set correct permissions
-- Harden SSH config via include file
-- Validate & restart SSH
+- Creating and deploying SSH keys
+- Configuring MikroTik NAC router as a secure jump host
+- Hardening Debian VMs SSH configuration
+- Validating and restarting SSH services safely
+- Hardening MikroTik SSH configuration 
 
 ---
 
-## Install `sudo`
-
-```bash
-su -
-apt update && apt install -y sudo
-```
-
-## Add user to sudo individually
-Do not add to sudo group — add explicit rule in sudoers.
-Open sudoers securely:
-```bash
-visudo
-```
-Add this line (replace user with your username):
-```bash
-user ALL=(root) PASSWD: ALL
-```
-
-## Create SSH Key
-In PowerShell:
+## 1. Create SSH Keys & Deploy to Servers
+Generate three separate SSH key pairs on your local machine (%USERPROFILE% on Windows):
+### 1.1 Backup VM (recommended: ed25519)
 ```bash
 ssh-keygen -t ed25519 -C "InfrastructureAndNetworkSecurity"
 ```
-The key will be generated at:
+### 1.2 NAC Router Access Key
 ```bash
-%USERPROFILE%\.ssh\id_ed25519
+ssh-keygen -t rsa -b 4096 -f router_id_rsa -C "NAC Router Access Key"
 ```
-
-## Upload key to server
-Copy public key:
+This key pair will be used to authenticate to the MikroTik router.
+### 1.3 Internal Debian VM Key (MUST be PEM format)
 ```bash
-%USERPROFILE%\.ssh\id_ed25519
+ssh-keygen -t rsa -b 4096 -m PEM -f internal_debian_key -C "Internal Debian Key"
 ```
-Connect to server using password:
-```bash
-ssh user@localhost -p xxxx
-```
-Create authorized_keys:
+MikroTik only accepts RSA private keys in PEM format, hence -m PEM.
+### 1.4 Deploy Public Keys to Each Server
+Repeat this process for every Linux-based system (Debian VM and Backup VM):
 ```bash
 mkdir -p ~/.ssh
 chmod 700 ~/.ssh
-
-nano ~/.ssh/authorized_keys
-```
-Paste the public key, save, then:
-```bash
+nano ~/.ssh/authorized_keys   # paste public key here
 chmod 600 ~/.ssh/authorized_keys
 ```
-Test login:
-```bash
-ssh user@localhost -p xxxx
-```
+Make sure the pasted key is on one line with no extra spaces.
 
-## Copy Hardened SSH Config
+## 2. Configure NAC Router as a Jump Host
+To reach the internal Debian VM, the MikroTik acts as a jump server.
+Two keys must be uploaded to the router:
+| Key | Purpose |
+|--------|---------|
+| `router_id_rsa.pub` | Public key to authenticate into the router |
+| `internal_debian_key` | Private key the router will use to authenticate into Debian VM |
+Upload these two files to the MikroTik using SCP.
+### 2.1 Import the Key Used to Log Into the Router
+```bash
+/user ssh-keys import public-key-file=router_id_rsa.pub
+```
+After importing, check:
+```bash
+/user ssh-keys print
+```
+### 2.2 Import the Key Used for Jumping to Debian VM
+```bash
+/user ssh-keys private import private-key-file=internal_debian_key
+```
+If MikroTik shows “wrong format or bad passphrase”, the key is not PEM or contains a passphrase.
+Verify that MikroTik accepted it:
+```bash
+/user ssh-keys private print
+```
+### 2.3 Test the Jump Connection
+From the MikroTik terminal:
+```bash
+/system ssh address=192.168.10.2 user=user
+```
+If configured correctly:
+- SSH will not ask for a password
+- Login should be automatic using the imported key
+
+## 3. Harden SSH Configuration (Debian / Linux Servers)
 Edit main config:
 ```bash
 sudo nano /etc/ssh/sshd_config
@@ -94,13 +100,28 @@ Copy the content of hardened_sshd_config_example file
 | `ClientAliveCountMax` | Number of keepalive retries before disconnect | `2–3` |
 | `Include` | Load extra config files (modular config) | `Include /etc/ssh/sshd_config.d/*.conf` |
 
-## Validate SSH configuration
+## 4. Validate SSH configuration
+Always validate before restarting, to avoid locking yourself out:
 ```bash
 sudo sshd -t
 ```
-If there's no output, config is good
-
-## Restart SSH service
+If there are no errors:
 ```bash
 sudo systemctl restart ssh
+```
+
+## 5. Hardening MikroTik SSH configuration
+MikroTik RouterOS provides several options to secure and harden SSH access.
+The following settings reduce the attack surface, enforce strong crypto, and ensure that only authorized key-based logins are allowed.
+### 5.1 Enforce Strong Cryptography
+```bash
+ip ssh set strong-crypto=yes
+```
+This disables:
+- SSHv1
+- Weak/legacy algorithms
+### 5.2 Disable Password Authentication (key-only login)
+Make sure key-based login is confirmed working before disabling passwords.
+```bash
+ip ssh set always-allow-password-login=no
 ```
