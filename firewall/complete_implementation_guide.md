@@ -228,6 +228,7 @@ iptables -A INPUT -j DROP
 
 # Save rules
 iptables-save > /etc/iptables/rules.v4
+```
 
 **Why these specific rules for AAA?**
 - RADIUS ports only from NAC network (authentication source)
@@ -363,6 +364,7 @@ iptables -A INPUT -j DROP
 # Save rules
 # ==================================================
 iptables-save > /etc/iptables/rules.v4
+```
 Execute:
 ```bash
 sudo chmod +x /root/web_firewall.sh
@@ -378,7 +380,6 @@ sudo /root/web_firewall.sh
 ### Step 2.3: Configure Backup Server Firewall
 
 SSH to Backup Server (10.0.2.4):
-```bash
 # Create firewall script
 
 
@@ -387,6 +388,7 @@ Execute:
 sudo chmod +x /root/backup_firewall.sh
 sudo /root/backup_firewall.sh
 ```
+```bash
 root@backup:~# cat /root/backup_firewall.sh
 #!/bin/bash
 # Backup Server Hardened Firewall (Direct Port-Knocking + DNS Fix)
@@ -484,7 +486,7 @@ iptables -A INPUT -m limit --limit 5/min -j LOG --log-prefix "BKP-DROP: "
 # Save rules
 # ==================================================
 iptables-save > /etc/iptables/rules.v4
-
+```
 **Why these specific rules for Backup?**
 - Rsync only from AAA and Web (authorized backup sources)
 - No other services (dedicated backup server)
