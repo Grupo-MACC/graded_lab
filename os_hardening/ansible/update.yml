@@ -1,30 +1,12 @@
-- name: Actualizar sistemas Debian
+- name: Actualizar y hacer upgrade en sistemas Debian
   hosts: debian_hosts
   become: yes
-  
+
   tasks:
     - name: Actualizar cache de apt
       apt:
         update_cache: yes
-        cache_valid_time: 3600
-      
+
     - name: Hacer upgrade de paquetes
       apt:
         upgrade: dist
-        autoremove: yes
-        autoclean: yes
-      register: upgrade_result
-      
-    - name: Mostrar resultado
-      debug:
-        msg: "Actualización completada en {{ inventory_hostname }}"
-      
-    - name: Verificar si necesita reinicio
-      stat:
-        path: /var/run/reboot-required
-      register: reboot_required
-      
-    - name: Notificar si necesita reinicio
-      debug:
-        msg: "⚠️  {{ inventory_hostname }} necesita reinicio"
-      when: reboot_required.stat.exists
