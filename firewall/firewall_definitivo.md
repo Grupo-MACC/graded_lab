@@ -106,7 +106,7 @@ sudo apt install fail2ban
 
 AAA
 
----
+```bash
 #!/bin/bash
 # AAA Server Firewall – Configuración de seguridad unificada con port-knocking
 
@@ -209,11 +209,11 @@ iptables -A INPUT -j DROP   # Aplica política por defecto: deniega cualquier ot
 # ============ GUARDADO =============
 iptables-save > /etc/iptables/rules.v4   # Guarda las reglas en configuración persistente
 
----
+```
 
----
 WEB
 
+```bash
 
 # ============ OTRA VERSION DE PORT KNOCKING ============
 # ============ PORT-KNOCKING (Requiere knock cada vez) ============
@@ -304,7 +304,8 @@ iptables -A INPUT -j DROP   # Descarta cualquier otro tráfico entrante no permi
 # ============= GUARDADO =============
 iptables-save > /etc/iptables/rules.v4
 
----
+```
+
 ## FILTER NAC
 
 ```routeros
@@ -384,6 +385,8 @@ add chain=srcnat action=masquerade src-address=10.1.2.0/24 out-interface=ether1 
 
 ## FILTER Supplicant
 
+```bash
+
 /ip firewall filter
 
 # INPUT chain rules (tráfico al propio router Supplicant)
@@ -413,10 +416,14 @@ add chain=forward action=drop protocol=tcp tcp-flags=syn connection-limit=100,32
 add chain=forward action=log log-prefix="FWD DROP: " limit=1/10s comment="FORWARD: Log de tráfico bloqueado"
 add chain=forward action=drop comment="FORWARD: Descartar todo otro tráfico forward"
 
+```
+
 
 # NAT rules (enmascaramiento de la red Supplicant hacia DMZ)
-/ip firewall nat add chain=srcnat action=masquerade src-address=10.1.2.0/24 out-interface=<VPN_INTERFACE> comment="NAT: Masquerade de Supplicant 10.1.2.0/24 hacia DMZ":contentReference[oaicite:1]{index=1}
 
+```bash
+/ip firewall nat add chain=srcnat action=masquerade src-address=10.1.2.0/24 out-interface=<VPN_INTERFACE> comment="NAT: Masquerade de Supplicant 10.1.2.0/24 hacia DMZ":contentReference[oaicite:1]{index=1}
+```
 
 ## WEB_DB
 
@@ -751,4 +758,5 @@ Your IP should appear in **Banned IPs**.
 
 # ✅ Document Ready for Delivery
 Ask me if you want this also as **PDF**, **DOCX**, or integrated into a full deployment manual.
+
 
