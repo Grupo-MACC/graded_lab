@@ -211,7 +211,7 @@ iptables-save > /etc/iptables/rules.v4   # Guarda las reglas en configuración p
 
 ```
 
-WEB
+Port Knocking
 
 ```bash
 
@@ -239,11 +239,12 @@ iptables -A INPUT -p tcp --dport 22 \
 iptables -A INPUT -m recent --name KNOCK1 --remove
 iptables -A INPUT -m recent --name KNOCK2 --remove
 iptables -A INPUT -m recent --name KNOCK3 --remove
+```
 ---
 
 
 BACKUP
-
+```bash
 #!/bin/bash
 # Backup Server Firewall – Reglas de firewall para proteger el servidor de backups
 
@@ -303,8 +304,102 @@ iptables -A INPUT -j DROP   # Descarta cualquier otro tráfico entrante no permi
 
 # ============= GUARDADO =============
 iptables-save > /etc/iptables/rules.v4
+```
+
+```bash
+#!/bin/bash
+# Web Server Firewall – Reglas de DMZ con protección DDoS y Port-Knocking
+
+# ============= VARIABLES =============
+WEB_IP="192.168.10.2"
+AAA_IP="192.168.1.1"
+BACKUP_IP="10.0.2.5"
+DMZ_GW="192.168.10.1"     # IP del router NAC en la DMZ (gateway del Web)
+
+# ============= LIMPIEZA =============
+iptables -F           # Borra reglas existentes
+iptables -X           # Borra cadenas personalizadas
+iptables -Z           # Reinicia contadores
+
+# ============= POLÍTICAS =============
+iptables -P INPUT DROP       # Denegar todo tráfico entrante por defecto
+iptables -P FORWARD DROP     # No reenviar (servidor no actúa como router)
+iptables -P OUTPUT ACCEPT    # Permitir tráfico saliente por defecto
+
+# ============= LOOPBACK =============
+iptables -A INPUT -i lo -j ACCEPT         # Permite tráfico local (loopback)
+iptables -A OUTPUT -o lo -j ACCEPT
+
+# ============= CONEXIONES ESTABLECIDAS =============
+iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT   # Permite tráfico de conexiones ya establecidas/relacionadas
+
+# ============= SSH DIRECTO DESDE DMZ GW =============
+iptables -A INPUT -s $DMZ_GW -p tcp --dport 22 -j ACCEPT   # Permite SSH desde el router NAC (gateway DMZ) para gestión
+
+# ============= PORT-KNOCKING (acceso SSH bajo demanda) =============
+iptables -A INPUT -p tcp --dport 7000 -m recent --name KNOCK1 --set -j DROP          # Primer knock
+iptables -A INPUT -p tcp --dport 8000 -m recent --name KNOCK1 --rcheck --seconds 15 \
+          -m recent --name KNOCK2 --set -j DROP                                      # Segundo knock (dentro de 15s del primero)
+iptables -A INPUT -p tcp --dport 9000 -m recent --name KNOCK2 --rcheck --seconds 15 \
+          -m recent --name KNOCK3 --set -j DROP                                      # Tercer knock (dentro de 15s del segundo)
+iptables -A INPUT -p tcp --dport 22 -m recent --name KNOCK3 --rcheck --seconds 30 -j ACCEPT   # Permite SSH si la secuencia de knock se completó en <30s
+
+# Eliminar marcas de knock para requerir la secuencia en cada conexión nueva
+iptables -A INPUT -m recent --name KNOCK1 --remove
+iptables -A INPUT -m recent --name KNOCK2 --remove
+iptables -A INPUT -m recent --name KNOCK3 --remove
+
+# ============= ICMP LIMITADO =============
+iptables -A INPUT -p icmp --icmp-type echo-request -m limit --limit 5/s -j ACCEPT   # Permite ping entrante (limitado a 5 por segundo)
+
+# ============= PROTECCIÓN SYN FLOOD =============
+iptables -N SYN_FLOOD
+iptables -A INPUT -p tcp --syn -j SYN_FLOOD
+iptables -A SYN_FLOOD -m limit --limit 100/s --limit-burst 150 -j RETURN   # Permite hasta 100 SYN/s (burst 150)
+iptables -A SYN_FLOOD -j DROP                                             # Bloquea exceso de SYNs
+
+# ============= HTTP/HTTPS con LÍMITES =============
+iptables -A INPUT -p tcp --dport 80 -m connlimit --connlimit-above 100 -j REJECT --reject-with tcp-reset    # Limita a 100 conexiones concurrentes por IP para HTTP
+iptables -A INPUT -p tcp --dport 443 -m connlimit --connlimit-above 100 -j REJECT --reject-with tcp-reset   # Limita a 100 conexiones concurrentes por IP para HTTPS
+
+iptables -A INPUT -p tcp --dport 80 -m recent --name HTTP --update --seconds 1 --hitcount 20 -j DROP   # Limita nuevas conexiones HTTP a 20 por segundo por IP
+iptables -A INPUT -p tcp --dport 80 -m recent --name HTTP --set
+iptables -A INPUT -p tcp --dport 443 -m recent --name HTTPS --update --seconds 1 --hitcount 20 -j DROP  # Limita nuevas conexiones HTTPS a 20 por segundo por IP
+iptables -A INPUT -p tcp --dport 443 -m recent --name HTTPS --set
+
+iptables -A INPUT -p tcp --dport 80 -j ACCEPT    # Permitir tráfico HTTP (80) tras pasar los filtros anteriores
+iptables -A INPUT -p tcp --dport 443 -j ACCEPT   # Permitir tráfico HTTPS (443) tras pasar los filtros
+
+# ============= SALIDA =============
+iptables -A OUTPUT -d $AAA_IP -p udp --dport 514 -j ACCEPT    # Enviar logs al servidor AAA (syslog centralizado)
+iptables -A OUTPUT -d $AAA_IP -p udp --dport 123 -j ACCEPT    # Consultar NTP al servidor AAA (hora interna)
+iptables -A OUTPUT -d $BACKUP_IP -p tcp --dport 873 -j ACCEPT # Enviar backups (rsync) al servidor Backup
+
+iptables -A OUTPUT -p udp --dport 53 -j ACCEPT    # DNS saliente (UDP)
+iptables -A OUTPUT -p tcp --dport 53 -j ACCEPT    # DNS saliente (TCP)
+## iptables -A OUTPUT -p tcp --dport 80 -j ACCEPT   # (Opcional) HTTP saliente para actualizaciones 
+## iptables -A OUTPUT -p tcp --dport 443 -j ACCEPT  # (Opcional) HTTPS saliente para actualizaciones 
+
+# ============= LOGGING =============
+iptables -A INPUT -m limit --limit 5/min -j LOG --log-prefix "WEB-DROP: "   # Log básico de paquetes entrantes descartados
+
+# ============= DROP FINAL =============
+iptables -A INPUT -j DROP    # Descarta cualquier otro tráfico entrante
+
+# ============= GUARDADO =============
+iptables-save > /etc/iptables/rules.v4
+
+# ARP SPOOFING PROTECTION
+sysctl -w net.ipv4.conf.all.arp_ignore=1       # Kernel: no responder ARP que no vaya dirigido a este host
+sysctl -w net.ipv4.conf.all.arp_announce=2     # Kernel: anunciar solo la IP propia en ARP (evita conflictos)
+arptables -F
+arptables -A INPUT -d $WEB_IP -j ACCEPT        # Permite ARP dirigido a la IP del Web server
+arptables -A INPUT -s $DMZ_GW -j ACCEPT        # Permite ARP proveniente del gateway DMZ (router NAC)
+arptables -A INPUT -j DROP                     # Bloquea cualquier otro ARP
+arptables-save > /etc/arptables/rules.v4
 
 ```
+
 
 ## FILTER NAC
 
@@ -760,6 +855,7 @@ Your IP should appear in **Banned IPs**.
 
 # ✅ Document Ready for Delivery
 Ask me if you want this also as **PDF**, **DOCX**, or integrated into a full deployment manual.
+
 
 
 
