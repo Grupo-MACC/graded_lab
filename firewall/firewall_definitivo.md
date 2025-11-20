@@ -247,6 +247,7 @@ BACKUP
 ```bash
 #!/bin/bash
 # Backup Server Firewall – Reglas de firewall para proteger el servidor de backups
+# Con Port Knocking para acceso SSH adicional
 
 # ============= VARIABLES =============
 BACKUP_IP="10.0.2.5"
@@ -260,7 +261,7 @@ iptables -Z
 # ============= POLÍTICAS POR DEFECTO =============
 iptables -P INPUT DROP       # Deniega todo tráfico entrante no autorizado (política por defecto)
 iptables -P FORWARD DROP     # No reenvía paquetes (servidor no actúa como router)
-iptables -P OUTPUT DROP      # **Restringe todo tráfico saliente** por defecto (se permitirán solo servicios necesarios)
+iptables -P OUTPUT DROP      # Restringe todo tráfico saliente por defecto (se permitirán solo servicios necesarios)
 
 # ============= LOOPBACK =============
 iptables -A INPUT -i lo -j ACCEPT        # Acepta tráfico local (loopback) entrante
@@ -272,7 +273,7 @@ iptables -A INPUT -s $BACKUP_IP ! -i lo -j DROP        # Bloquea paquetes con la
 
 # ============= CONEXIONES ESTABLECIDAS =============
 iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT   # Acepta tráfico entrante de conexiones establecidas/relacionadas
-iptables -A INPUT -m conntrack --ctstate INVALID -j DROP                # Descarta inmediatamente cualquier paquete inválido entrante
+iptables -A INPUT -m conntrack --ctstate INVALID -j DROP                 # Descarta inmediatamente cualquier paquete inválido entrante
 
 # ============= ICMP (PING) =============
 iptables -A INPUT -p icmp --icmp-type echo-request -m limit --limit 5/s -j ACCEPT   # Permite ping entrante de diagnóstico (limitado a 5 por segundo)
@@ -283,27 +284,53 @@ iptables -A INPUT -p tcp --syn -j SYN_FLOOD
 iptables -A SYN_FLOOD -m limit --limit 100/s --limit-burst 150 -j RETURN  # Permite hasta 100 SYN/seg (burst 150)
 iptables -A SYN_FLOOD -j DROP                                            # Descarta SYN excedentes (protección SYN flood)
 
-# ============= ACCESOS ADMIN/RESPALDO =============
-iptables -A INPUT -s $NAC_WAN_IP -p tcp --dport 22 -j ACCEPT    # Permite acceso SSH **solo** desde el router NAC (red de gestión confiable)
-iptables -A INPUT -s $NAC_WAN_IP -p tcp --dport 873 -j ACCEPT   # Permite conexiones entrantes rsync (puerto 873) solo desde NAC (clientes internos via NAT)
+# ============= ACCESOS ADMIN/RESPALDO (DESDE NAC) =============
+iptables -A INPUT -s $NAC_WAN_IP -p tcp --dport 22 -j ACCEPT    # SSH directo solo desde el router NAC (red de gestión confiable)
+iptables -A INPUT -s $NAC_WAN_IP -p tcp --dport 873 -j ACCEPT   # rsync (puerto 873) solo desde NAC (clientes internos via NAT)
 
-# (Opcional) Reglas de port-knocking podrían implementarse aquí para SSH si se requiriera acceso remoto adicional fuera del NAC
+# ============= PORT KNOCKING PARA SSH ADICIONAL =============
+# Secuencia: TCP 7000 -> 8000 -> 9000 (en < 15s entre golpes) y luego abre SSH (22) durante 30s para esa IP
 
-# ============= SALIDA =============
-iptables -A OUTPUT -p udp --dport 53 -j ACCEPT        # Permite consultas DNS salientes (UDP)
-iptables -A OUTPUT -p tcp --dport 53 -j ACCEPT        # Permite consultas DNS salientes (TCP)
-iptables -A OUTPUT -p udp --dport 123 -j ACCEPT       # Permite tráfico NTP saliente (sincronización con servidores de hora)
-iptables -A OUTPUT -p tcp --dport 80 -j ACCEPT        # Permite tráfico HTTP saliente (actualizaciones del sistema)
-iptables -A OUTPUT -p tcp --dport 443 -j ACCEPT       # Permite tráfico HTTPS saliente (actualizaciones del sistema)
+# Knock 1: primer golpe en 7000
+iptables -A INPUT -p tcp --dport 7000 \
+    -m recent --name KNOCK1 --set -j DROP
+
+# Knock 2: segundo golpe en 8000 si KNOCK1 existe hace <15s
+iptables -A INPUT -p tcp --dport 8000 \
+    -m recent --name KNOCK1 --rcheck --seconds 15 \
+    -m recent --name KNOCK2 --set -j DROP
+
+# Knock 3: tercer golpe en 9000 si KNOCK2 existe hace <15s
+iptables -A INPUT -p tcp --dport 9000 \
+    -m recent --name KNOCK2 --rcheck --seconds 15 \
+    -m recent --name KNOCK3 --set -j DROP
+
+# Permitir SSH (22) si la secuencia KNOCK3 es válida en los últimos 30s
+iptables -A INPUT -p tcp --dport 22 \
+    -m recent --name KNOCK3 --update --seconds 30 --reap \
+    -j ACCEPT
+
+# Limpieza de marcas de port knocking para evitar estados viejos
+iptables -A INPUT -m recent --name KNOCK1 --remove
+iptables -A INPUT -m recent --name KNOCK2 --remove
+iptables -A INPUT -m recent --name KNOCK3 --remove
+
+# ============= SALIDA (TRÁFICO PERMITIDO) =============
+iptables -A OUTPUT -p udp --dport 53 -j ACCEPT        # DNS saliente (UDP)
+iptables -A OUTPUT -p tcp --dport 53 -j ACCEPT        # DNS saliente (TCP)
+iptables -A OUTPUT -p udp --dport 123 -j ACCEPT       # NTP saliente
+iptables -A OUTPUT -p tcp --dport 80 -j ACCEPT        # HTTP saliente (actualizaciones del sistema)
+iptables -A OUTPUT -p tcp --dport 443 -j ACCEPT       # HTTPS saliente (actualizaciones del sistema)
 
 # ============= LOGGING =============
 iptables -A INPUT -m limit --limit 5/min -j LOG --log-prefix "BACKUP-DROP: "  # Registra a baja frecuencia los intentos de acceso no autorizados
 
 # ============= DROP FINAL =============
-iptables -A INPUT -j DROP   # Descarta cualquier otro tráfico entrante no permitido
+iptables -A INPUT -j DROP   # Descarta cualquier otro tráfico entrante no permitido (refuerzo, aunque la política ya es DROP)
 
 # ============= GUARDADO =============
 iptables-save > /etc/iptables/rules.v4
+
 ```
 
 ```bash
@@ -855,6 +882,7 @@ Your IP should appear in **Banned IPs**.
 
 # ✅ Document Ready for Delivery
 Ask me if you want this also as **PDF**, **DOCX**, or integrated into a full deployment manual.
+
 
 
 
