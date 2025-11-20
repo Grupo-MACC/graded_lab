@@ -106,7 +106,7 @@ sudo apt install fail2ban
 
 AAA
 
-
+---
 #!/bin/bash
 # AAA Server Firewall – Configuración de seguridad unificada con port-knocking
 
@@ -209,8 +209,9 @@ iptables -A INPUT -j DROP   # Aplica política por defecto: deniega cualquier ot
 # ============ GUARDADO =============
 iptables-save > /etc/iptables/rules.v4   # Guarda las reglas en configuración persistente
 
+---
 
-
+---
 WEB
 
 
@@ -303,7 +304,7 @@ iptables -A INPUT -j DROP   # Descarta cualquier otro tráfico entrante no permi
 # ============= GUARDADO =============
 iptables-save > /etc/iptables/rules.v4
 
-
+---
 ## FILTER NAC
 
 ```routeros
@@ -750,3 +751,4 @@ Your IP should appear in **Banned IPs**.
 
 # ✅ Document Ready for Delivery
 Ask me if you want this also as **PDF**, **DOCX**, or integrated into a full deployment manual.
+
