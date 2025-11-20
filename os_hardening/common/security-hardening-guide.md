@@ -240,6 +240,12 @@ Durante este proceso, usar el servicio de forma normal para que AppArmor aprenda
 ```bash
 aa-enforce /etc/apparmor.d/*
 ```
+### Aplicar modo complain si se ha sobreescrito (por lo visto muy probable)
+```bash
+aa-complain /usr/sbin/php-fpm8.2
+aa-complain /usr/sbin/mariadbd
+aa-complain /usr/sbin/nginx
+```
 
 ### Estado final esperado
 ```bash
@@ -271,7 +277,32 @@ aa-status
 ```
 
 ---
+## Software update mechanism
+### Install and configure unattended-upgrades
+This updates the necessary packages for security
 
+```bash
+apt install unattended-upgrades
+dpkg-reconfigure unattended-upgrades
+nano /etc/apt/apt.conf.d/50unattended-upgrades
+```
+### Pegar lo siguiente
+```bash
+Unattended-Upgrade::Origins-Pattern {
+        // Solo actualizaciones de seguridad — totalmente seguro
+        "o=Ubuntu,a=${distro_codename}-security";
+};
+
+// No reiniciar automáticamente servicios ni el sistema
+Unattended-Upgrade::Automatic-Reboot "false";
+Unattended-Upgrade::Automatic-Reboot-WithUsers "false";
+```
+### Automatizar el proceso
+```bash
+crontab -e > 0 3 1 * * /usr/local/sbin/safe-upgrade.sh
+nano /usr/local/sbin/safe-upgrade.sh #Pegar el archivo
+chmod +x /usr/local/sbin/safe-upgrade.sh
+```
 ## Resumen
 
 Esta guía cubre los aspectos esenciales del hardening de seguridad en Linux:
@@ -281,5 +312,6 @@ Esta guía cubre los aspectos esenciales del hardening de seguridad en Linux:
 3. **Integridad:** Monitoreo con AIDE para detectar cambios no autorizados
 4. **Kernel:** Protecciones a nivel de kernel contra ataques de red
 5. **AppArmor:** Control de acceso obligatorio para limitar el alcance de los procesos
+6. **Mecanismo de actualizacion de software:** Actualizacion de paquetes que pueden comprometer la seguridad
 
 Implementar estas medidas proporciona múltiples capas de seguridad (defensa en profundidad) para proteger el sistema contra diversos vectores de ataque.
