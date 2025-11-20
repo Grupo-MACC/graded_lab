@@ -433,6 +433,8 @@ add chain=forward action=drop comment="FORWARD: Descartar todo otro tráfico for
 flush ruleset
 
 # Definir tabla y cadenas de filtrado
+
+```bash
 #!/usr/sbin/nft -f
 # Tabla y cadenas de filtrado para servidor Web/BD (DMZ e Interno)
 flush ruleset
@@ -486,7 +488,7 @@ table inet webdb_filter {
         # El resto de tráfico saliente no está permitido (DROP por política por defecto)
     }
 }
-
+```
 
 ## PHASE 4: ADVANCED PROTECTIONS
 
@@ -758,5 +760,6 @@ Your IP should appear in **Banned IPs**.
 
 # ✅ Document Ready for Delivery
 Ask me if you want this also as **PDF**, **DOCX**, or integrated into a full deployment manual.
+
 
 
