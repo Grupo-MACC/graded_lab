@@ -9,7 +9,7 @@ function generateTableFromResult($result) {
    $html = '<table class="table table-striped">';
    while($row = mysqli_fetch_array($result, MYSQLI_ASSOC)) {
         $html.="<tr>";
-	$html.="<td><a href='".$actual_link."/index.php?flight=".$row['FLIGHT_CODE']."'>".$row['FLIGHT_CODE']."</a></td>";
+        $html.="<td><a href='".$actual_link."/index.php?flight=".$row['FLIGHT_CODE']."'>".$row['FLIGHT_CODE']."</a></td>";
         $html.="<td>".$row['SOURCE']."</td>";
         $html.="<td>".$row['DESTINATION']."</td>";
         $html.="<td>".$row['ARRIVAL']."</td>";
@@ -37,12 +37,12 @@ function generateTableFromResult($result) {
 
 <!-- Optional: some overlay text to describe the video -->
 <div class="content">
-<?php 
+<?php
 
     if(!isset($_GET['flight']))
     {
       $query = "SELECT * FROM FLIGHT LIMIT 10";
-    } else { 
+    } else {
       $flightid = $_GET['flight'];
       $flightid = "$flightid";
       $query = "SELECT * FROM FLIGHT WHERE FLIGHT_CODE = '$flightid'";
@@ -52,7 +52,7 @@ function generateTableFromResult($result) {
 $result = mysqli_query($conn,$query) or die(mysqli_error());
 
 
-echo generateTableFromResult($result); 
+echo generateTableFromResult($result);
 
 ?>
 
