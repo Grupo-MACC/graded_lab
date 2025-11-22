@@ -30,7 +30,7 @@ AAA
 
 ```bash
 #!/bin/bash
-# AAA Server Firewall – con Ping funcional + Port-Knocking funcional + Anti-DDoS sin conflictos
+# AAA Server Firewall – with working Ping + working Port-Knocking + Anti-DDoS without conflicts
 
 # ============= VARIABLES =============
 AAA_IP="192.168.1.1"
@@ -38,29 +38,29 @@ NAC_IP="192.168.1.2"
 WEB_IP="192.168.10.2"
 BACKUP_IP="10.0.2.5"
 
-# ============ LIMPIEZA =============
+# ============ CLEANUP =============
 iptables -F
 iptables -X
 iptables -Z
 
-# ============ POLÍTICAS POR DEFECTO =============
+# ============ DEFAULT POLICIES =============
 iptables -P INPUT DROP
 iptables -P FORWARD DROP
-iptables -P OUTPUT DROP     # Salida restringida (pero permitimos ICMP reply y DNS/NTP/etc.)
+iptables -P OUTPUT DROP     # Restricted output (but we allow ICMP reply and DNS/NTP/etc.)
 
 # ============ LOOPBACK =============
 iptables -A INPUT -i lo -j ACCEPT
 iptables -A OUTPUT -o lo -j ACCEPT
 
-# ============ CONEXIONES ESTABLECIDAS =============
+# ============ ESTABLISHED CONNECTIONS =============
 iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 iptables -A OUTPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 
-# ============ ICMP (PING) – TIENE QUE IR ANTES DEL ANTI-DDoS =============
+# ============ ICMP (PING) – MUST GO BEFORE ANTI-DDoS =============
 iptables -A INPUT -p icmp --icmp-type echo-request -m limit --limit 5/s -j ACCEPT
-iptables -A OUTPUT -p icmp -j ACCEPT        # Permite responder al ping (IMPORTANTÍSIMO)
+iptables -A OUTPUT -p icmp -j ACCEPT        # Allows ping responses (VERY IMPORTANT)
 
-# ============ PORT-KNOCKING (3 pasos para SSH) =============
+# ============ PORT-KNOCKING (3 steps for SSH) =============
 
 # Knock 1
 iptables -A INPUT -p tcp --dport 7000 \
@@ -76,31 +76,31 @@ iptables -A INPUT -p tcp --dport 9000 \
     -m recent --name KNOCK2 --rcheck --seconds 15 \
     -m recent --name KNOCK3 --set -j DROP
 
-# === SSH tras knock: REGRA 1 (solo comprobar) ===
+# === SSH after knock: RULE 1 (only check) ===
 iptables -A INPUT -p tcp --dport 22 \
     -m recent --name KNOCK3 --rcheck --seconds 30 \
     -j ACCEPT
 
-# === SSH tras knock: REGLA 2 (actualizar estado) ===
+# === SSH after knock: RULE 2 (update state) ===
 iptables -A INPUT -p tcp --dport 22 \
     -m recent --name KNOCK3 --update --seconds 30 --reap \
     -j ACCEPT
 
-# Limpieza
+# Cleanup
 iptables -A INPUT -m recent --name KNOCK1 --remove
 iptables -A INPUT -m recent --name KNOCK2 --remove
 iptables -A INPUT -m recent --name KNOCK3 --remove
 
-# ============ SSH DIRECTO DESDE NAC (sin knocking) =============
+# ============ DIRECT SSH FROM NAC (no knocking) =============
 #iptables -A INPUT -s $NAC_IP -p tcp --dport 22 -j ACCEPT
 
-# ============ ANTI-DDoS (SYN FLOOD) – DESPUÉS del ICMP y PK ============
+# ============ ANTI-DDoS (SYN FLOOD) – AFTER ICMP and PK ============
 iptables -N ANTI_DDOS
 iptables -A INPUT -p tcp -m tcp --syn -j ANTI_DDOS
 iptables -A ANTI_DDOS -m limit --limit 100/s --limit-burst 150 -j RETURN
 iptables -A ANTI_DDOS -j DROP
 
-# ============ NTP (SERVICIO DE HORA) =============
+# ============ NTP (TIME SERVICE) =============
 iptables -A INPUT -p udp --dport 123 -s 192.168.1.0/24 -j ACCEPT
 iptables -A INPUT -p udp --dport 123 -s 192.168.10.0/24 -j ACCEPT
 iptables -A INPUT -p udp --dport 123 -s 10.1.1.0/24 -j ACCEPT
@@ -115,7 +115,7 @@ iptables -A INPUT -p udp --dport 1813 -s 10.1.1.0/24 -j ACCEPT
 # ============ SYSLOG =============
 iptables -A INPUT -p udp --dport 514 -s $WEB_IP -j ACCEPT
 
-# ============ PROTECCIÓN CONTRA ESCANEOS =============
+# ============ SCAN PROTECTION =============
 iptables -A INPUT -p tcp --tcp-flags ALL NONE -j DROP
 iptables -A INPUT -p tcp --tcp-flags ALL FIN -j DROP
 iptables -A INPUT -p tcp --tcp-flags ALL FIN,PSH,URG -j DROP
@@ -123,7 +123,7 @@ iptables -A INPUT -p tcp --tcp-flags ALL SYN,RST -j DROP
 iptables -A INPUT -p tcp --tcp-flags ALL SYN,FIN -j DROP
 iptables -A INPUT -p tcp --tcp-flags ALL ALL -j DROP
 
-# ============ OUTPUT AUTORIZADO =============
+# ============ AUTHORIZED OUTPUT =============
 iptables -A OUTPUT -d $AAA_IP -p udp --dport 514 -j ACCEPT
 iptables -A OUTPUT -d $AAA_IP -p udp --dport 123 -j ACCEPT
 iptables -A OUTPUT -d $BACKUP_IP -p tcp --dport 873 -j ACCEPT
@@ -138,10 +138,10 @@ iptables -A OUTPUT -p tcp --dport 80 -j ACCEPT
 # ============ LOGGING =============
 iptables -A INPUT -m limit --limit 5/min -j LOG --log-prefix "AAA-DROP: "
 
-# ============ DROP FINAL =============
+# ============ FINAL DROP =============
 iptables -A INPUT -j DROP
 
-# ============ PROTECCIÓN ARP (RECOMENDADA) =============
+# ============ ARP PROTECTION (RECOMMENDED) =============
 sysctl -w net.ipv4.conf.all.arp_ignore=1
 sysctl -w net.ipv4.conf.all.arp_announce=2
 
@@ -151,8 +151,9 @@ arptables -A INPUT -s $NAC_IP -j ACCEPT
 arptables -A INPUT -j DROP
 arptables-save > /etc/arptables/rules.v4
 
-# ============ GUARDADO =============
+# ============ SAVE RULES =============
 iptables-save > /etc/iptables/rules.v4
+
 
 ```
 
@@ -167,198 +168,199 @@ BACKUP SERVER
 # Backup Server Hardened Firewall (Direct Port-Knocking + DNS Fix)
 
 # ==================================================
-# Flush
+# Flush existing rules
 # ==================================================
-iptables -F
-iptables -X
-iptables -Z
+iptables -F               # Delete all rules
+iptables -X               # Delete all custom chains
+iptables -Z               # Reset packet counters
 
 # ==================================================
-# Policies
+# Default Policies
 # ==================================================
-iptables -P INPUT DROP
-iptables -P FORWARD DROP
-iptables -P OUTPUT ACCEPT
+iptables -P INPUT DROP    # Block all incoming traffic by default
+iptables -P FORWARD DROP  # Do not forward traffic (server is not a router)
+iptables -P OUTPUT ACCEPT # Allow all outgoing traffic
 
 # ==================================================
-# Loopback
+# Loopback Interface
 # ==================================================
-iptables -A INPUT -i lo -j ACCEPT
+iptables -A INPUT -i lo -j ACCEPT   # Allow local loopback traffic
 iptables -A OUTPUT -o lo -j ACCEPT
 
 # ==================================================
-# Established / Related
+# Allow Established / Related Connections
 # ==================================================
 iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 
 # ==================================================
-# DNS Response Fix (UDP/TCP src port 53)
+# DNS Response Fix (allow replies from port 53)
 # ==================================================
-iptables -A INPUT -p udp --sport 53 -j ACCEPT
-iptables -A INPUT -p tcp --sport 53 -j ACCEPT
+iptables -A INPUT -p udp --sport 53 -j ACCEPT   # Allow DNS responses (UDP)
+iptables -A INPUT -p tcp --sport 53 -j ACCEPT   # Allow DNS responses (TCP)
 
 # ==================================================
-# ICMP (solo NAT INTERNAL)
+# ICMP (only from NAT internal network)
 # ==================================================
-iptables -A INPUT -p icmp -s 10.0.2.0/24 -j ACCEPT
+iptables -A INPUT -p icmp -s 10.0.2.0/24 -j ACCEPT   # Allow ICMP from internal NAT
 
 # ==================================================
-# PORT KNOCKING (direct mode)
+# PORT KNOCKING (direct mode, 7000 → 8000 → 9000)
 # ==================================================
 
-# Knock 1
+# Knock 1: port 7000
 iptables -A INPUT -p tcp --dport 7000 \
-    -m recent --name KNOCK1 --set -j DROP
+    -m recent --name KNOCK1 --set -j DROP     # Register knock 1 and drop packet
 
-# Knock 2
+# Knock 2: port 8000 (must occur within 15s after knock 1)
 iptables -A INPUT -p tcp --dport 8000 \
     -m recent --name KNOCK1 --rcheck --seconds 15 \
-    -m recent --name KNOCK2 --set -j DROP
+    -m recent --name KNOCK2 --set -j DROP     # Register knock 2 and drop packet
 
-# Knock 3
+# Knock 3: port 9000 (must occur within 15s after knock 2)
 iptables -A INPUT -p tcp --dport 9000 \
     -m recent --name KNOCK2 --rcheck --seconds 15 \
-    -m recent --name KNOCK3 --set -j DROP
+    -m recent --name KNOCK3 --set -j DROP     # Register knock 3 and drop packet
 
-# Allow SSH after knock sequence (<30s)
+# Allow SSH if the 3-knock sequence was completed (within 30 seconds)
 iptables -A INPUT -p tcp --dport 22 \
     -m recent --name KNOCK3 --update --seconds 30 --reap \
-    -j ACCEPT
+    -j ACCEPT                                  # Allow SSH after valid knock sequence
 
-# Cleanup stale knocks
+# Cleanup: remove old knock states to force fresh sequences
 iptables -A INPUT -m recent --name KNOCK1 --remove
 iptables -A INPUT -m recent --name KNOCK2 --remove
 iptables -A INPUT -m recent --name KNOCK3 --remove
 
 # ==================================================
-# RSYNC (873/tcp) only from AAA + Web
+# RSYNC (tcp/873) only from AAA + Web Server
 # ==================================================
-iptables -A INPUT -p tcp --dport 873 -s 192.168.1.1 -j ACCEPT
-iptables -A INPUT -p tcp --dport 873 -s 192.168.10.2 -j ACCEPT
+iptables -A INPUT -p tcp --dport 873 -s 192.168.1.1 -j ACCEPT   # Allow rsync from AAA server
+iptables -A INPUT -p tcp --dport 873 -s 192.168.10.2 -j ACCEPT  # Allow rsync from Web server
 
-# Limit simultaneous backup connections
+# Limit simultaneous rsync connections (max 10)
 iptables -A INPUT -p tcp --dport 873 -m connlimit --connlimit-above 10 -j REJECT
 
 # ==================================================
-# OUTPUT rules
+# OUTPUT Rules (DNS, NTP, Updates)
 # ==================================================
-iptables -A OUTPUT -p udp --dport 53 -j ACCEPT
-iptables -A OUTPUT -p tcp --dport 53 -j ACCEPT
+iptables -A OUTPUT -p udp --dport 53 -j ACCEPT   # Allow outgoing DNS (UDP)
+iptables -A OUTPUT -p tcp --dport 53 -j ACCEPT   # Allow outgoing DNS (TCP)
 
-iptables -A OUTPUT -p udp --dport 123 -j ACCEPT
+iptables -A OUTPUT -p udp --dport 123 -j ACCEPT  # Allow outgoing NTP
 
-iptables -A OUTPUT -p tcp --dport 80 -j ACCEPT
-iptables -A OUTPUT -p tcp --dport 443 -j ACCEPT
+iptables -A OUTPUT -p tcp --dport 80 -j ACCEPT   # Allow outgoing HTTP
+iptables -A OUTPUT -p tcp --dport 443 -j ACCEPT  # Allow outgoing HTTPS
 
 # ==================================================
 # Logging
 # ==================================================
-iptables -A INPUT -m limit --limit 5/min -j LOG --log-prefix "BKP-DROP: "
+iptables -A INPUT -m limit --limit 5/min -j LOG --log-prefix "BKP-DROP: "   # Log dropped packets (rate limited)
 
 # ==================================================
-# Save rules
+# Save rules to persistent storage
 # ==================================================
 iptables-save > /etc/iptables/rules.v4
+
 
 ```
 WEB SERVER
 
 ```bash
 #!/bin/bash
-# Web Server Firewall – Reglas de DMZ con protección DDoS y Port-Knocking
+# Web Server Firewall – DMZ rules with DDoS protection and Port-Knocking
 
 # ============= VARIABLES =============
 WEB_IP="192.168.10.2"
 AAA_IP="192.168.1.1"
 BACKUP_IP="10.0.2.5"
-DMZ_GW="192.168.10.1"     # IP del router NAC en la DMZ (gateway del Web)
+DMZ_GW="192.168.10.1"     # IP of the NAC router in the DMZ (Web server gateway)
 WEB_DB_IP="192.168.1.3"
 
-# ============= LIMPIEZA =============
-iptables -F           # Borra reglas existentes
-iptables -X           # Borra cadenas personalizadas
-iptables -Z           # Reinicia contadores
+# ============= CLEANUP =============
+iptables -F           # Delete existing rules
+iptables -X           # Delete custom chains
+iptables -Z           # Reset counters
 
-# ============= POLÍTICAS =============
-iptables -P INPUT DROP       # Denegar todo tráfico entrante por defecto
-iptables -P FORWARD DROP     # No reenviar (servidor no actúa como router)
-iptables -P OUTPUT ACCEPT    # Permitir tráfico saliente por defecto
+# ============= POLICIES =============
+iptables -P INPUT DROP       # Deny all incoming traffic by default
+iptables -P FORWARD DROP     # Do not forward traffic (server is not a router)
+iptables -P OUTPUT ACCEPT    # Allow all outgoing traffic by default
 
 # ============= LOOPBACK =============
-iptables -A INPUT -i lo -j ACCEPT         # Permite tráfico local (loopback)
+iptables -A INPUT -i lo -j ACCEPT         # Allow local (loopback) traffic
 iptables -A OUTPUT -o lo -j ACCEPT
 
-# ============= CONEXIONES ESTABLECIDAS =============
-iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT   # Permite tráfico de conexiones ya establecidas/relacionadas
+# ============= ESTABLISHED CONNECTIONS =============
+iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT   # Allow traffic from established/related connections
 
-# ============= SSH DIRECTO DESDE DMZ GW =============
-#iptables -A INPUT -s $DMZ_GW -p tcp --dport 22 -j ACCEPT   # Permite SSH desde el router NAC (gateway DMZ) para gestión
+# ============= DIRECT SSH FROM DMZ GW =============
+#iptables -A INPUT -s $DMZ_GW -p tcp --dport 22 -j ACCEPT   # Allow SSH from the NAC router (DMZ gateway) for management
 
-# ============= PORT-KNOCKING (acceso SSH bajo demanda) =============
-iptables -A INPUT -p tcp --dport 7000 -m recent --name KNOCK1 --set -j DROP          # Primer knock
+# ============= PORT-KNOCKING (on-demand SSH access) =============
+iptables -A INPUT -p tcp --dport 7000 -m recent --name KNOCK1 --set -j DROP          # First knock
 iptables -A INPUT -p tcp --dport 8000 -m recent --name KNOCK1 --rcheck --seconds 15 \
-          -m recent --name KNOCK2 --set -j DROP                                      # Segundo knock (dentro de 15s del primero)
+          -m recent --name KNOCK2 --set -j DROP                                      # Second knock (within 15s of the first)
 iptables -A INPUT -p tcp --dport 9000 -m recent --name KNOCK2 --rcheck --seconds 15 \
-          -m recent --name KNOCK3 --set -j DROP                                      # Tercer knock (dentro de 15s del segundo)
-iptables -A INPUT -p tcp --dport 22 -m recent --name KNOCK3 --rcheck --seconds 30 -j ACCEPT   # Permite SSH si la secuencia de knock se completó en <30s
+          -m recent --name KNOCK3 --set -j DROP                                      # Third knock (within 15s of the second)
+iptables -A INPUT -p tcp --dport 22 -m recent --name KNOCK3 --rcheck --seconds 30 -j ACCEPT   # Allow SSH if knock sequence completed in <30s
 
-# Eliminar marcas de knock para requerir la secuencia en cada conexión nueva
+# Remove knock marks so that a new knock sequence is required next time
 iptables -A INPUT -m recent --name KNOCK1 --remove
 iptables -A INPUT -m recent --name KNOCK2 --remove
 iptables -A INPUT -m recent --name KNOCK3 --remove
 
-# ============= ICMP LIMITADO =============
-iptables -A INPUT -p icmp --icmp-type echo-request -m limit --limit 5/s -j ACCEPT   # Permite ping entrante (limitado a 5 por segundo)
+# ============= LIMITED ICMP =============
+iptables -A INPUT -p icmp --icmp-type echo-request -m limit --limit 5/s -j ACCEPT   # Allow incoming ping (limited to 5 per second)
 
-# ============= PROTECCIÓN SYN FLOOD =============
+# ============= SYN FLOOD PROTECTION =============
 iptables -N SYN_FLOOD
 iptables -A INPUT -p tcp --syn -j SYN_FLOOD
-iptables -A SYN_FLOOD -m limit --limit 100/s --limit-burst 150 -j RETURN   # Permite hasta 100 SYN/s (burst 150)
-iptables -A SYN_FLOOD -j DROP                                             # Bloquea exceso de SYNs
+iptables -A SYN_FLOOD -m limit --limit 100/s --limit-burst 150 -j RETURN   # Allow up to 100 SYN/s (burst 150)
+iptables -A SYN_FLOOD -j DROP                                             # Block excessive SYNs
 
-# ============= HTTP/HTTPS con LÍMITES =============
-iptables -A INPUT -p tcp --dport 80 -m connlimit --connlimit-above 100 -j REJECT --reject-with tcp-reset    # Limita a 100 conexiones concurrentes por IP para HTTP
-iptables -A INPUT -p tcp --dport 443 -m connlimit --connlimit-above 100 -j REJECT --reject-with tcp-reset   # Limita a 100 conexiones concurrentes por IP para HTTPS
+# ============= HTTP/HTTPS WITH LIMITS =============
+iptables -A INPUT -p tcp --dport 80 -m connlimit --connlimit-above 100 -j REJECT --reject-with tcp-reset    # Limit to 100 concurrent HTTP connections per IP
+iptables -A INPUT -p tcp --dport 443 -m connlimit --connlimit-above 100 -j REJECT --reject-with tcp-reset   # Limit to 100 concurrent HTTPS connections per IP
 
-iptables -A INPUT -p tcp --dport 80 -m recent --name HTTP --update --seconds 1 --hitcount 20 -j DROP   # Limita nuevas conexiones HTTP a 20 por segundo por IP
+iptables -A INPUT -p tcp --dport 80 -m recent --name HTTP --update --seconds 1 --hitcount 20 -j DROP   # Limit new HTTP connections to 20 per second per IP
 iptables -A INPUT -p tcp --dport 80 -m recent --name HTTP --set
-iptables -A INPUT -p tcp --dport 443 -m recent --name HTTPS --update --seconds 1 --hitcount 20 -j DROP  # Limita nuevas conexiones HTTPS a 20 por segundo por IP
+iptables -A INPUT -p tcp --dport 443 -m recent --name HTTPS --update --seconds 1 --hitcount 20 -j DROP  # Limit new HTTPS connections to 20 per second per IP
 iptables -A INPUT -p tcp --dport 443 -m recent --name HTTPS --set
 
-iptables -A INPUT -p tcp --dport 80 -j ACCEPT    # Permitir tráfico HTTP (80) tras pasar los filtros anteriores
-iptables -A INPUT -p tcp --dport 443 -j ACCEPT   # Permitir tráfico HTTPS (443) tras pasar los filtros
+iptables -A INPUT -p tcp --dport 80 -j ACCEPT    # Allow HTTP (80) after passing previous filters
+iptables -A INPUT -p tcp --dport 443 -j ACCEPT   # Allow HTTPS (443) after passing previous filters
 
 # ============== WEB =================
-iptables -A INPUT -s $WEB_DB_IP -p tcp --dport 3306 -j ACCEPT
+iptables -A INPUT -s $WEB_DB_IP -p tcp --dport 3306 -j ACCEPT   # Allow MariaDB traffic from DB server
 
-# ============= SALIDA =============
-iptables -A OUTPUT -d $AAA_IP -p udp --dport 514 -j ACCEPT    # Enviar logs al servidor AAA (syslog centralizado)
-iptables -A OUTPUT -d $AAA_IP -p udp --dport 123 -j ACCEPT    # Consultar NTP al servidor AAA (hora interna)
-iptables -A OUTPUT -d $BACKUP_IP -p tcp --dport 873 -j ACCEPT # Enviar backups (rsync) al servidor Backup
+# ============= OUTPUT =============
+iptables -A OUTPUT -d $AAA_IP -p udp --dport 514 -j ACCEPT    # Send logs to AAA server (centralized syslog)
+iptables -A OUTPUT -d $AAA_IP -p udp --dport 123 -j ACCEPT    # Query NTP from AAA server (internal time)
+iptables -A OUTPUT -d $BACKUP_IP -p tcp --dport 873 -j ACCEPT # Send backups (rsync) to Backup server
 
-iptables -A OUTPUT -p udp --dport 53 -j ACCEPT    # DNS saliente (UDP)
-iptables -A OUTPUT -p tcp --dport 53 -j ACCEPT    # DNS saliente (TCP)
-## iptables -A OUTPUT -p tcp --dport 80 -j ACCEPT   # (Opcional) HTTP saliente para actualizaciones
-## iptables -A OUTPUT -p tcp --dport 443 -j ACCEPT  # (Opcional) HTTPS saliente para actualizaciones
-
+iptables -A OUTPUT -p udp --dport 53 -j ACCEPT    # Outgoing DNS (UDP)
+iptables -A OUTPUT -p tcp --dport 53 -j ACCEPT    # Outgoing DNS (TCP)
+## iptables -A OUTPUT -p tcp --dport 80 -j ACCEPT   # (Optional) Outgoing HTTP for updates
+## iptables -A OUTPUT -p tcp --dport 443 -j ACCEPT  # (Optional) Outgoing HTTPS for updates
 
 # ============= LOGGING =============
-iptables -A INPUT -m limit --limit 5/min -j LOG --log-prefix "WEB-DROP: "   # Log básico de paquetes entrantes descartados
+iptables -A INPUT -m limit --limit 5/min -j LOG --log-prefix "WEB-DROP: "   # Basic logging for dropped incoming packets
 
-# ============= DROP FINAL =============
-iptables -A INPUT -j DROP    # Descarta cualquier otro tráfico entrante
+# ============= FINAL DROP =============
+iptables -A INPUT -j DROP    # Drop any remaining incoming traffic
 
-# ============= GUARDADO =============
+# ============= SAVE =============
 iptables-save > /etc/iptables/rules.v4
 
 # ARP SPOOFING PROTECTION
-sysctl -w net.ipv4.conf.all.arp_ignore=1       # Kernel: no responder ARP que no vaya dirigido a este host
-sysctl -w net.ipv4.conf.all.arp_announce=2     # Kernel: anunciar solo la IP propia en ARP (evita conflictos)
+sysctl -w net.ipv4.conf.all.arp_ignore=1       # Kernel: do not respond to ARP that is not directed to this host
+sysctl -w net.ipv4.conf.all.arp_announce=2     # Kernel: announce only own IP in ARP (avoids conflicts)
 arptables -F
-arptables -A INPUT -d $WEB_IP -j ACCEPT        # Permite ARP dirigido a la IP del Web server
-arptables -A INPUT -s $DMZ_GW -j ACCEPT        # Permite ARP proveniente del gateway DMZ (router NAC)
-arptables -A INPUT -j DROP                     # Bloquea cualquier otro ARP
+arptables -A INPUT -d $WEB_IP -j ACCEPT        # Allow ARP destined to the Web server IP
+arptables -A INPUT -s $DMZ_GW -j ACCEPT        # Allow ARP from the DMZ gateway (NAC router)
+arptables -A INPUT -j DROP                     # Block any other ARP
 arptables-save > /etc/arptables/rules.v4
+
 
 ```
 
@@ -366,123 +368,57 @@ arptables-save > /etc/arptables/rules.v4
 ## FILTER NAC
 
 ```routeros
-[admin@NAC] > ip firewall filter print
-Flags: X - disabled, I - invalid; D - dynamic
- 0    ;;; INPUT: Allow established/related
-      chain=input action=accept connection-state=established,related
 
- 1    ;;; INPUT: Drop invalid packets
-      chain=input action=drop connection-state=invalid
 
- 2    ;;; INPUT: Allow loopback
-      chain=input action=accept in-interface=lo
+# INPUT chain rules (traffic to the NAC router)
+add chain=input action=accept connection-state=established,related comment="INPUT: Allow established/related connections"
+add chain=input action=drop connection-state=invalid comment="INPUT: Drop invalid packets"
+add chain=input action=accept in-interface=lo comment="INPUT: Allow loopback"
+add chain=input action=accept protocol=icmp src-address=192.168.1.0/24 comment="INPUT: Allow ICMP from NAC network"
+add chain=input action=accept protocol=icmp src-address=192.168.10.0/24 comment="INPUT: Allow ICMP from DMZ network"
+add chain=input action=accept protocol=icmp src-address=10.1.1.0/24 comment="INPUT: Allow ICMP from Supplicant1 network"
+add chain=input action=accept protocol=udp src-address=192.168.1.0/24 dst-port=67,68 comment="INPUT: Allow DHCP requests from NAC network"
+add chain=input action=accept protocol=udp src-address=192.168.10.0/24 dst-port=67,68 comment="INPUT: Allow DHCP requests from DMZ network"
+add chain=input action=drop protocol=udp in-interface=ether1 dst-port=67,68 comment="INPUT: Block DHCP from external (WAN) interface"
+add chain=input action=accept protocol=tcp src-address-list=MGMT dst-port=22 comment="INPUT: Allow SSH from MGMT (trusted addresses)"
+add chain=input action=accept protocol=tcp src-address-list=MGMT dst-port=8291 comment="INPUT: Allow WinBox from MGMT (trusted)"
 
- 3    ;;; INPUT: Allow ICMP from NAC network
-      chain=input action=accept protocol=icmp src-address=192.168.1.0/24
+# Port knocking
+add chain=input action=add-src-to-address-list protocol=tcp address-list=knock_stage1 address-list-timeout=15s dst-port=1111 comment="INPUT: Port knock stage 1"
+add chain=input action=add-src-to-address-list protocol=tcp src-address-list=knock_stage1 address-list=knock_stage2 address-list-timeout=15s dst-port=2222 comment="INPUT: Port knock stage 2"
+add chain=input action=add-src-to-address-list protocol=tcp src-address-list=knock_stage2 address-list=knock_stage3 address-list-timeout=10m dst-port=3333 comment="INPUT: Port knock stage 3 (granted access)"
+add chain=input action=accept protocol=tcp src-address-list=knock_stage3 dst-port=22 comment="INPUT: Allow SSH after knocking"
+add chain=input action=accept protocol=tcp src-address-list=knock_stage3 dst-port=8291 comment="INPUT: Allow WinBox after knocking"
+add chain=input action=log protocol=tcp src-address-list=!knock_stage3 dst-port=22 log-prefix="SSH-NO-KNOCK:" comment="INPUT: Log SSH attempts without knock"
+add chain=input action=drop protocol=tcp src-address-list=!knock_stage3 dst-port=22 comment="INPUT: Drop SSH without knock"
+add chain=input action=drop protocol=tcp src-address-list=!knock_stage3 dst-port=8291 comment="INPUT: Drop WinBox without knock"
 
- 4    ;;; INPUT: Allow ICMP from DMZ network
-      chain=input action=accept protocol=icmp src-address=192.168.10.0/24
+# Scan detection
+add chain=input action=drop tcp-flags=fin,!syn,!rst,!psh,!ack,!urg protocol=tcp comment="INPUT: Drop FIN stealth scan"
+add chain=input action=accept protocol=udp dst-port=1812,1813,1645,1646 comment="INPUT: Allow RADIUS"
+add chain=input action=drop tcp-flags=syn,rst protocol=tcp comment="INPUT: Drop SYN-RST scan"
+add chain=input action=drop tcp-flags=fin,syn protocol=tcp comment="INPUT: Drop SYN-FIN scan"
+add chain=input action=drop tcp-flags=!fin,!syn,!rst,!psh,!ack,!urg protocol=tcp comment="INPUT: Drop NULL scan"
+add chain=input action=drop tcp-flags=fin,psh,urg,!syn,!rst,!ack protocol=tcp comment="INPUT: Drop XMAS scan"
 
- 5    ;;; INPUT: Allow ICMP from Supplicant1 network
-      chain=input action=accept protocol=icmp src-address=10.1.1.0/24
+add chain=input action=accept protocol=udp src-address=10.100.0.0/30 dst-address=192.168.1.1 comment="INPUT: Allow specific UDP traffic"
 
- 6    ;;; INPUT: Allow DHCP requests from NAC network
-      chain=input action=accept protocol=udp src-address=192.168.1.0/24 dst-port=67,68
+# FORWARD chain rules
+add chain=forward action=drop connection-state=invalid comment="FORWARD: Drop invalid packets"
+add chain=forward action=drop connection-limit=50,32 protocol=tcp dst-address=192.168.10.2 dst-port=80 comment="FORWARD: Limit HTTP connections per IP to Web server"
+add chain=forward action=drop connection-limit=50,32 protocol=tcp dst-address=192.168.10.2 dst-port=443 comment="FORWARD: Limit HTTPS connections per IP to Web server"
+add chain=forward action=accept src-address=192.168.10.0/24 dst-address=!192.168.0.0/16 comment="FORWARD: Allow DMZ to Internet"
+add chain=forward action=accept src-address=192.168.10.0/24 dst-address=192.168.1.0/24 comment="FORWARD: Allow DMZ to NAC (e.g., Web to DB/AAA)"
+add chain=forward action=accept src-address=192.168.1.0/24 dst-address=!192.168.0.0/16 comment="FORWARD: Allow NAC to Internet"
+add chain=forward action=accept src-address=192.168.1.0/24 dst-address=192.168.10.0/24 comment="FORWARD: Allow NAC to DMZ"
+add chain=forward action=accept src-address=10.1.1.0/24 comment="FORWARD: Allow Supplicant1 to any destination"
+add chain=forward action=accept src-address=10.1.2.0/24 comment="FORWARD: Allow Supplicant gateway to any destination"
+add chain=forward action=drop tcp-flags=syn connection-limit=100,32 protocol=tcp comment="FORWARD: Drop SYN flood (>100 new SYN/s per IP)"
 
- 7    ;;; INPUT: Allow DHCP requests from DMZ network
-      chain=input action=accept protocol=udp src-address=192.168.10.0/24 dst-port=67,68
+# Prevent private IPs leaking to WAN
+add chain=forward action=drop src-address=192.168.0.0/16 out-interface=ether1 comment="FORWARD: Drop private 192.168.x.x to WAN"
+add chain=forward action=drop src-address=172.16.0.0/12 out-interface=ether1 comment="FORWARD: Drop private 172.16.x.x to WAN"
 
- 8    ;;; INPUT: Block DHCP from external (WAN) interface
-      chain=input action=drop protocol=udp in-interface=ether1 dst-port=67,68
-
- 9    ;;; INPUT: SSH from MGMT (trusted management addresses)
-      chain=input action=accept protocol=tcp src-address-list=MGMT dst-port=22
-
-10    ;;; INPUT: WinBox from MGMT (trusted)
-      chain=input action=accept protocol=tcp src-address-list=MGMT dst-port=8291
-
-11    ;;; INPUT: Port knock stage 1
-      chain=input action=add-src-to-address-list protocol=tcp address-list=knock_stage1 address-list-timeout=15s
-      dst-port=1111
-
-12    ;;; INPUT: Port knock stage 2
-      chain=input action=add-src-to-address-list protocol=tcp src-address-list=knock_stage1 address-list=knock_stage2
-      address-list-timeout=15s dst-port=2222
-
-13    ;;; INPUT: Port knock stage 3 (access granted)
-      chain=input action=add-src-to-address-list protocol=tcp src-address-list=knock_stage2 address-list=knock_stage3
-      address-list-timeout=10m dst-port=3333
-
-14    ;;; INPUT: SSH after knocking
-      chain=input action=accept protocol=tcp src-address-list=knock_stage3 dst-port=22
-
-15    ;;; INPUT: WinBox after knocking
-      chain=input action=accept protocol=tcp src-address-list=knock_stage3 dst-port=8291
-
-16    ;;; INPUT: Log SSH attempt without knock
-      chain=input action=log protocol=tcp src-address-list=!knock_stage3 dst-port=22 log-prefix="SSH-NO-KNOCK:"
-
-17    ;;; INPUT: Drop SSH without knock
-      chain=input action=drop protocol=tcp src-address-list=!knock_stage3 dst-port=22
-
-18    ;;; INPUT: Drop WinBox without knock
-      chain=input action=drop protocol=tcp src-address-list=!knock_stage3 dst-port=8291
-
-19    ;;; INPUT: Drop FIN scan (stealth FIN)
-      chain=input action=drop tcp-flags=fin,!syn,!rst,!psh,!ack,!urg protocol=tcp
-
-20    ;;; Allow radius
-      chain=input action=accept protocol=udp dst-port=1812,1813,1645,1646
-
-21    ;;; INPUT: Drop SYN-RST scan
-      chain=input action=drop tcp-flags=syn,rst protocol=tcp
-
-22    ;;; INPUT: Drop SYN-FIN scan
-      chain=input action=drop tcp-flags=fin,syn protocol=tcp
-
-23    ;;; INPUT: Drop NULL scan (no flags)
-      chain=input action=drop tcp-flags=!fin,!syn,!rst,!psh,!ack,!urg protocol=tcp
-
-24    ;;; INPUT: Drop XMAS scan (FIN+PSH+URG)
-      chain=input action=drop tcp-flags=fin,psh,urg,!syn,!rst,!ack protocol=tcp
-
-25    chain=input action=accept protocol=udp src-address=10.100.0.0/30 dst-address=192.168.1.1
-
-26    ;;; FORWARD: Drop invalid
-      chain=forward action=drop connection-state=invalid
-
-27    ;;; FORWARD: Limit HTTP conn per IP to Web server
-      chain=forward action=drop connection-limit=50,32 protocol=tcp dst-address=192.168.10.2 dst-port=80
-
-28    ;;; FORWARD: Limit HTTPS conn per IP to Web server
-      chain=forward action=drop connection-limit=50,32 protocol=tcp dst-address=192.168.10.2 dst-port=443
-
-29    ;;; FORWARD: Allow DMZ to Internet
-      chain=forward action=accept src-address=192.168.10.0/24 dst-address=!192.168.0.0/16
-
-30    ;;; FORWARD: Allow DMZ to NAC network (e.g., Web to DB/AAA)
-      chain=forward action=accept src-address=192.168.10.0/24 dst-address=192.168.1.0/24
-
-31    ;;; FORWARD: Allow NAC to Internet
-      chain=forward action=accept src-address=192.168.1.0/24 dst-address=!192.168.0.0/16
-
-32    ;;; FORWARD: Allow NAC to DMZ network
-      chain=forward action=accept src-address=192.168.1.0/24 dst-address=192.168.10.0/24
-
-33    ;;; FORWARD: Supplicant1 a cualquier destino
-      chain=forward action=accept src-address=10.1.1.0/24
-
-34    ;;; FORWARD: Supplicant gateway a cualquier destino
-      chain=forward action=accept src-address=10.1.2.0/24
-
-35    ;;; FORWARD: Drop SYN flood (>100 new SYN/s per IP)
-      chain=forward action=drop tcp-flags=syn connection-limit=100,32 protocol=tcp
-
-36    ;;; FORWARD: Drop private src 192.168.x.x heading to Internet
-      chain=forward action=drop src-address=192.168.0.0/16 out-interface=ether1
-
-37    ;;; FORWARD: Drop private src 172.16.x.x heading to Internet
-      chain=forward action=drop src-address=172.16.0.0/12 out-interface=ether1
 
 [admin@NAC] > ip firewall nat print
 Flags: X - disabled, I - invalid; D - dynamic
@@ -506,38 +442,56 @@ Flags: X - disabled, I - invalid; D - dynamic
 
 ```
 
+## NAT NAC
+
+```routeros
+add chain=srcnat action=masquerade out-interface=ether1 comment="NAT: Default masquerade"
+
+add chain=srcnat action=masquerade src-address=192.168.1.0/24 out-interface=ether1 comment="NAT: NAC network to Internet"
+
+add chain=srcnat action=masquerade src-address=192.168.10.0/24 out-interface=ether1 comment="NAT: DMZ network to Internet"
+
+add chain=srcnat action=masquerade src-address=10.0.2.0/24 out-interface=ether1 comment="NAT: VirtualBox NAT network to Internet"
+
+add chain=srcnat action=masquerade src-address=10.1.1.0/24 out-interface=ether1 comment="NAT: Supplicant1 network to Internet"
+
+add chain=srcnat action=masquerade src-address=10.1.2.0/24 out-interface=ether1 comment="NAT: Supplicant gateway to Internet"
+
+```
+
+
 ## FILTER Supplicant
 
 ```bash
 
 /ip firewall filter
+# INPUT chain rules (traffic to the Supplicant router itself)
+add chain=input action=accept connection-state=established,related comment="INPUT: Allow established/related connections"
+add chain=input action=drop connection-state=invalid comment="INPUT: Drop invalid packets"
+add chain=input action=accept protocol=tcp src-address=192.168.1.0/24 dst-port=22 comment="INPUT: Allow SSH from NAC network (administration)"
+add chain=input action=accept protocol=tcp src-address=192.168.1.0/24 dst-port=8291 comment="INPUT: Allow WinBox from NAC network (administration)"
+add chain=input action=add-src-to-address-list protocol=tcp psd=21,3s,3,1 address-list=port_scanners address-list-timeout=1d comment="INPUT: Detect port scan (PSD)"
+add chain=input action=add-src-to-address-list protocol=tcp tcp-flags=fin,!syn,!rst,!psh,!ack,!urg src-address-list=!port_scanners address-list=port_scanners address-list-timeout=1d comment="INPUT: Detect FIN stealth scan"
+add chain=input action=add-src-to-address-list protocol=tcp tcp-flags=fin,psh,urg,!syn,!rst,!ack src-address-list=!port_scanners address-list=port_scanners address-list-timeout=1d comment="INPUT: Detect XMAS scan (FIN+PSH+URG)"
+add chain=input action=add-src-to-address-list protocol=tcp tcp-flags=!fin,!syn,!rst,!psh,!ack,!urg src-address-list=!port_scanners address-list=port_scanners address-list-timeout=1d comment="INPUT: Detect NULL scan (no flags)"
+add chain=input action=drop src-address-list=port_scanners comment="INPUT: Block source detected as port scanner"
+add chain=input action=accept protocol=icmp limit=5/1s,10 comment="INPUT: Allow ICMP (ping) with rate limit"
+add chain=input action=accept protocol=udp src-address=10.1.1.0/24 dst-port=67,68 comment="INPUT: Allow DHCP requests from Supplicant network (clients obtaining IP)"
+add chain=input action=log log-prefix="INPUT DROP: " limit=1/5s comment="INPUT: Log and drop remaining traffic"
+add chain=input action=drop comment="INPUT: Drop all other incoming traffic"
 
-# INPUT chain rules (tráfico al propio router Supplicant)
-add chain=input action=accept connection-state=established,related comment="INPUT: Permitir conexiones establecidas/relacionadas"
-add chain=input action=drop connection-state=invalid comment="INPUT: Descartar paquetes inválidos"
-add chain=input action=accept protocol=tcp src-address=192.168.1.0/24 dst-port=22 comment="INPUT: Permitir SSH desde red NAC (administración)"
-add chain=input action=accept protocol=tcp src-address=192.168.1.0/24 dst-port=8291 comment="INPUT: Permitir WinBox desde red NAC (administración)"
-add chain=input action=add-src-to-address-list protocol=tcp psd=21,3s,3,1 address-list=port_scanners address-list-timeout=1d comment="INPUT: Detectar scan de puertos (PSD)"
-add chain=input action=add-src-to-address-list protocol=tcp tcp-flags=fin,!syn,!rst,!psh,!ack,!urg src-address-list=!port_scanners address-list=port_scanners address-list-timeout=1d comment="INPUT: Detectar scan tipo FIN (stealth)"
-add chain=input action=add-src-to-address-list protocol=tcp tcp-flags=fin,psh,urg,!syn,!rst,!ack src-address-list=!port_scanners address-list=port_scanners address-list-timeout=1d comment="INPUT: Detectar scan tipo XMAS (FIN+PSH+URG)"
-add chain=input action=add-src-to-address-list protocol=tcp tcp-flags=!fin,!syn,!rst,!psh,!ack,!urg src-address-list=!port_scanners address-list=port_scanners address-list-timeout=1d comment="INPUT: Detectar scan tipo NULL (sin flags)"
-add chain=input action=drop src-address-list=port_scanners comment="INPUT: Bloquear origen listado como escáner"
-add chain=input action=accept protocol=icmp limit=5/1s,10 comment="INPUT: Permitir ICMP (ping) limitado"
-add chain=input action=accept protocol=udp src-address=10.1.1.0/24 dst-port=67,68 comment="INPUT: Permitir solicitudes DHCP desde red Supplicant (clientes obteniendo IP)"
-add chain=input action=log log-prefix="INPUT DROP: " limit=1/5s comment="INPUT: Registrar y descartar restante"
-add chain=input action=drop comment="INPUT: Descartar todo otro tráfico de entrada"
+# FORWARD chain rules (traffic passing through the Supplicant router)
+add chain=forward action=accept connection-state=established,related comment="FORWARD: Allow established/related traffic"
+add chain=forward action=drop connection-state=invalid comment="FORWARD: Drop invalid packets"
+add chain=forward action=drop protocol=tcp src-address=10.1.2.0/24 dst-address=192.168.10.2 dst-port=80 connection-limit=50,32 comment="FORWARD: Limit concurrent HTTP connections per IP (>50) to Web DMZ server"
+add chain=forward action=drop protocol=tcp src-address=10.1.2.0/24 dst-address=192.168.10.2 dst-port=443 connection-limit=50,32 comment="FORWARD: Limit concurrent HTTPS connections per IP (>50) to Web DMZ server"
+add chain=forward action=accept protocol=tcp src-address=10.1.2.0/24 dst-address=192.168.10.2 dst-port=80 comment="FORWARD: Allow HTTP from Supplicant Gateway to Web DMZ server"
+add chain=forward action=accept protocol=tcp src-address=10.1.2.0/24 dst-address=192.168.10.2 dst-port=443 comment="FORWARD: Allow HTTPS from Supplicant Gateway to Web DMZ server"
+add chain=forward action=accept src-address=10.1.1.0/24 comment="FORWARD: Allow Supplicant1 to any destination"
+add chain=forward action=drop protocol=tcp tcp-flags=syn connection-limit=100,32 comment="FORWARD: Drop SYN flood (more than 100 new connections per IP)"
+add chain=forward action=log log-prefix="FWD DROP: " limit=1/10s comment="FORWARD: Log dropped traffic"
+add chain=forward action=drop comment="FORWARD: Drop all other forwarded traffic"
 
-# FORWARD chain rules (tráfico a través del router Supplicant)
-add chain=forward action=accept connection-state=established,related comment="FORWARD: Permitir tráfico establecido/relacionado"
-add chain=forward action=drop connection-state=invalid comment="FORWARD: Descartar paquetes inválidos"
-add chain=forward action=drop protocol=tcp src-address=10.1.2.0/24 dst-address=192.168.10.2 dst-port=80 connection-limit=50,32 comment="FORWARD: Limitar HTTP concurrente por IP (>50) hacia Web DMZ"
-add chain=forward action=drop protocol=tcp src-address=10.1.2.0/24 dst-address=192.168.10.2 dst-port=443 connection-limit=50,32 comment="FORWARD: Limitar HTTPS concurrente por IP (>50) hacia Web DMZ"
-add chain=forward action=accept protocol=tcp src-address=10.1.2.0/24 dst-address=192.168.10.2 dst-port=80 comment="FORWARD: Permitir HTTP desde Supplicant Gateway hacia servidor Web DMZ"
-add chain=forward action=accept protocol=tcp src-address=10.1.2.0/24 dst-address=192.168.10.2 dst-port=443 comment="FORWARD: Permitir HTTPS desde Supplicant Gateway hacia servidor Web DMZ"
-add chain=forward action=accept src-address=10.1.1.0/24 comment="FORWARD: Supplicant1 a cualquier destino"
-add chain=forward action=drop protocol=tcp tcp-flags=syn connection-limit=100,32 comment="FORWARD: Descartar SYN flood (más de 100 conexiones nuevas/IP)"
-add chain=forward action=log log-prefix="FWD DROP: " limit=1/10s comment="FORWARD: Log de tráfico bloqueado"
-add chain=forward action=drop comment="FORWARD: Descartar todo otro tráfico forward"
 
 ```
 
@@ -550,67 +504,112 @@ add chain=forward action=drop comment="FORWARD: Descartar todo otro tráfico for
 
 ## WEB_DB
 
-#!/usr/sbin/nft -f
-
-# Limpiar reglas existentes
-flush ruleset
-
-# Definir tabla y cadenas de filtrado
-
 ```bash
 #!/usr/sbin/nft -f
-# Tabla y cadenas de filtrado para servidor Web/BD (DMZ e Interno)
+# Web/DB server firewall (DMZ + Internal networks)
 flush ruleset
 
 table inet webdb_filter {
-    chain input {
-        type filter hook input priority 0; policy drop;
-        # Aceptar tráfico local y conexiones existentes
-        iif "lo" accept
-        ct state established,related accept
-        ct state invalid drop       # Descartar paquetes inválidos que no correspondan a ninguna conexión
-        
-        # Protección contra SYN flood (limita a 100 conexiones SYN/segundo por origen)
-        ip protocol tcp tcp flags syn limit rate 100/second accept
 
-        # Port-knocking para SSH (secuencia requerida: 7000 -> 8000 -> 9000)
-        set knock1 { type ipv4_addr; timeout 15s; }
-        set knock2 { type ipv4_addr; timeout 15s; }
-        set knock3 { type ipv4_addr; timeout 30s; }
-
-        tcp dport 7000 add @knock1 drop        # Knock 1: registra IP origen al contactar puerto 7000
-        ip saddr @knock1 tcp dport 8000 add @knock2 drop   # Knock 2: válido solo tras Knock1
-        ip saddr @knock2 tcp dport 9000 add @knock3 drop   # Knock 3: válido solo tras Knock2
-        ip saddr @knock3 tcp dport 22 accept    # Permite SSH desde IP origen si completó la secuencia de knocks correcta
-
-        # Permitir acceso a base de datos **solo** desde el servidor Web en DMZ
-        ip saddr 192.168.10.2 tcp dport 3306 accept    # Solo la IP del servidor Web puede acceder a MySQL/MariaDB
-
-        # Permitir ICMP (ping) entrante con límite razonable
-        ip protocol icmp limit rate 5/second accept
-
-        # Registrar y **soltar** todo lo demás no permitido
-        limit rate 5/minute log prefix "WEB_DB-DROP: "
-        drop
+    ##############################
+    #   DYNAMIC PORT-KNOCK SETS  #
+    ##############################
+    set knock1 {
+        type ipv4_addr;
+        flags dynamic,timeout;
+        timeout 15s;
     }
 
+    set knock2 {
+        type ipv4_addr;
+        flags dynamic,timeout;
+        timeout 15s;
+    }
+
+    set knock3 {
+        type ipv4_addr;
+        flags dynamic,timeout;
+        timeout 30s;
+    }
+
+    ##############################
+    #       PORT-KNOCK CHAIN     #
+    ##############################
+    chain KNOCK {
+        # Knock 1: contacting TCP 7000 adds source IP to @knock1 and drops the packet
+        tcp dport 7000 add @knock1 { ip saddr } drop
+
+        # Knock 2: only valid if IP is in @knock1; contacting TCP 8000 adds IP to @knock2
+        ip saddr @knock1 tcp dport 8000 add @knock2 { ip saddr } drop
+
+        # Knock 3: only valid if IP is in @knock2; contacting TCP 9000 adds IP to @knock3
+        ip saddr @knock2 tcp dport 9000 add @knock3 { ip saddr } drop
+
+        # SSH allowed only if IP successfully passed the 3 knocking stages
+        ip saddr @knock3 tcp dport 22 accept
+
+        # Default: deny all direct SSH attempts
+        tcp dport 22 drop
+    }
+
+    ##############################
+    #           INPUT            #
+    ##############################
+    chain input {
+        type filter hook input priority 0; policy drop;
+
+        # Allow loopback and established connections
+        iif "lo" accept
+        ct state established,related accept
+
+        # Drop invalid packets
+        ct state invalid drop
+
+        # Basic SYN flood protection (limit new TCP SYN to 100/s per source)
+        ip protocol tcp tcp flags syn limit rate 100/second accept
+
+        # Port-knocking processing
+        jump KNOCK
+
+        # Allow MySQL/MariaDB only from the Web server in the DMZ
+        ip saddr 192.168.10.2 tcp dport 3306 accept
+
+        # Allow ICMP echo requests (ping) with a reasonable rate limit
+        ip protocol icmp limit rate 5/second accept
+
+        # Log and drop anything else
+        limit rate 5/minute log prefix "WEB_DB-DROP: " counter drop
+    }
+
+    ##############################
+    #           OUTPUT           #
+    ##############################
     chain output {
         type filter hook output priority 0; policy drop;
-        # Permitir loopback y tráfico saliente ya establecido/relacionado
+
+        # Allow loopback and established outbound traffic
         oif "lo" accept
         ct state established,related accept
 
-        # Permitir tráfico saliente necesario (DNS, NTP, Backup, actualizaciones)
-        udp dport 53 accept      # Consultas DNS (UDP)
-        tcp dport 53 accept      # Consultas DNS (TCP)
-        udp dport 123 accept     # NTP hacia servidor de tiempo (sincronización de reloj)
-        tcp dport 873 accept     # rsync hacia servidor Backup (transferencia de respaldos)
-        tcp dport 80 accept      # (Opcional) HTTP saliente para actualizaciones/repositorios
-        tcp dport 443 accept     # (Opcional) HTTPS saliente para actualizaciones/repositorios
+        # Allow outbound DNS (UDP and TCP)
+        udp dport 53 ct state new,related accept
+        tcp dport 53 ct state new,related accept
 
-        # El resto de tráfico saliente no está permitido (DROP por política por defecto)
+        # Allow outbound NTP time sync
+        udp dport 123 ct state new,related accept
+
+        # Allow outbound rsync backups
+        tcp dport 873 ct state new,related accept
+
+        # Allow HTTP/HTTPS for updates or repositories
+        tcp dport 80 ct state new,related accept
+        tcp dport 443 ct state new,related accept
+
+        # Everything else is blocked by default policy
     }
 }
+
+
 ```
 
 ## PHASE 2: ADVANCED PROTECTIONS
@@ -795,6 +794,7 @@ maxretry = 3
 ```
 
 ---
+
 
 
 
