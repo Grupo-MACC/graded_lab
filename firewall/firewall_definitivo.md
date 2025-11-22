@@ -19,7 +19,7 @@ We're implementing multiple layers of security:
 | **Web Server** | Public-facing service | Receives external requests |
 | **Backup Server** | Data storage | Contains sensitive backups |
 | **NAC Router** | Main gateway | Controls all traffic flow |
-| **NAC2 and Supplicant1 Router** | DMZ gateway | Bridges internal and DMZ |
+| **NAC2 and Supplicant1 Router** | Redirect traffic | Exposed |
 
 
 ## PHASE 1: IMPLEMENT BASIC FIREWALL RULES
@@ -794,6 +794,7 @@ maxretry = 3
 ```
 
 ---
+
 
 
 
