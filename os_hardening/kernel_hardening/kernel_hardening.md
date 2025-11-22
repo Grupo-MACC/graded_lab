@@ -1,0 +1,43 @@
+## 4. Kernel Hardening
+
+### Configuración de seguridad del kernel
+```bash
+nano /etc/sysctl.d/kernel-security.conf
+```
+
+**Contenido del archivo:**
+```bash
+# Deshabilitar source routing
+net.ipv4.conf.all.accept_source_route = 0
+net.ipv6.conf.all.accept_source_route = 0
+
+# No aceptar redirecciones ICMP
+net.ipv4.conf.all.accept_redirects = 0
+net.ipv6.conf.all.accept_redirects = 0
+
+# No enviar redirecciones ICMP
+net.ipv4.conf.all.send_redirects = 0
+
+# Anti-spoofing
+net.ipv4.conf.all.rp_filter = 1
+
+# Protección contra SYN flood
+net.ipv4.tcp_syncookies = 1
+
+# No actuar como router
+net.ipv4.ip_forward = 0
+
+# Deshabilitar respuesta a ping broadcast
+net.ipv4.icmp_echo_ignore_broadcasts = 1
+net.ipv4.icmp_ignore_bogus_error_responses = 1
+
+# Log de paquetes sospechosos
+net.ipv4.conf.all.log_martians = 1
+```
+
+### Aplicar cambios
+```bash
+sysctl -p /etc/sysctl.d/kernel-security.conf
+# o simplemente
+sysctl -p
+```

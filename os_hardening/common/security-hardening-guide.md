@@ -277,7 +277,7 @@ aa-status
 ```
 
 ---
-## Software update mechanism
+## 6. Software update mechanism
 ### Install and configure unattended-upgrades
 This updates the necessary packages for security
 
