@@ -1,13 +1,14 @@
-## 2. Prevención de Filesystems Vulnerables
 
-Evitar la instalación de sistemas de archivos que pueden ser vectores de ataque.
+## 2. Preventing Vulnerable Filesystems
 
-**Crear archivo de configuración:**
+Prevent installation of file systems that can be attack vectors. We use the fake install method.
+
+**Create configuration file:**
 ```bash
 nano /etc/modprobe.d/securityclass.conf
 ```
 
-**Contenido del archivo:**
+**File contents:**
 ```bash
 install cramfs echo "You won't install it, bye, bye..."
 install freevxfs echo "It's not free"

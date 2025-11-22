@@ -1,45 +1,44 @@
-# Guía de Hardening de Seguridad Linux
+# Linux Security Hardening Guide
 
-## 1. Configuración de Usuarios y Shells
+## 1. User and Shell Configuration
 
-### Restricción de Shells
-Todos los usuarios deben tener `nologin` como shell, excepto el usuario principal con acceso SSH.
+### Shell Restriction
+All users should have `nologin` as their shell, except for the main user with SSH access.
 
-**Verificación:**
+**Verification:**
 ```bash
 cat /etc/passwd
 ```
 
-**Cambiar shell a nologin:**
+**Change shell to nologin if needed:**
 ```bash
-usermod -s /usr/sbin/nologin usuario
+usermod -s /usr/sbin/nologin username
 ```
 
-**Configurar bash restringido para el usuario principal:**
+**Configure restricted bash for the main user:**
 ```bash
 usermod -s /bin/rbash user
 ```
-Esto obliga al usuario a escalar privilegios para realizar operaciones administrativas.
+This forces the user to escalate privileges to perform administrative operations.
 
-### Instalación y configuración de sudo
+### Installing and configuring sudo
 ```bash
 apt update && apt install -y sudo
 cat /etc/sudoers
 ```
-Asegurarse de que solo esté configurado root, excepto en casos excepcionales.
-
+Ensure that only root is configured, except in exceptional cases.
 ---
 
-## 2. Prevención de Filesystems Vulnerables
+## 2. Preventing Vulnerable Filesystems
 
-Evitar la instalación de sistemas de archivos que pueden ser vectores de ataque.
+Prevent installation of file systems that can be attack vectors. We use the fake install method.
 
-**Crear archivo de configuración:**
+**Create configuration file:**
 ```bash
 nano /etc/modprobe.d/securityclass.conf
 ```
 
-**Contenido del archivo:**
+**File contents:**
 ```bash
 install cramfs echo "You won't install it, bye, bye..."
 install freevxfs echo "It's not free"
@@ -53,25 +52,25 @@ install vfat /bin/true
 
 ---
 
-## 3. Integridad de Archivos con AIDE
+## 3. File Integrity with AIDE
 
-### Instalación
+### Installation
 ```bash
 sudo apt install aide aide-common -y
 ```
 
-### Inicialización de la base de datos
+### Database initialization
 ```bash
 aideinit
 mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db
 ```
 
-### Configuración de archivos a monitorear
+### Configuring files to monitor
 ```bash
 nano /etc/aide/aide.conf
 ```
 
-**Ejemplo de configuración:**
+**Configuration example:**
 ```bash
 # Nginx
 /etc/nginx/                       Full
@@ -117,51 +116,50 @@ nano /etc/aide/aide.conf
 /var/lib/php/                     VarFile
 ```
 
-### Reinicializar y verificar
+### Reinitialize and verify
 ```bash
 aideinit
 mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db
 aide --config=/etc/aide/aide.conf --check
 ```
 
-### Prueba de AIDE
+### AIDE testing
 ```bash
-# Crear un archivo de prueba
-nano /etc/nginx/hola
+# Create a test file
+nano /etc/nginx/hello
 
-# Ejecutar verificación
+# Run verification
 aide --config=/etc/aide/aide.conf --check
 ```
 
-**Salida esperada:**
+**Expected output:**
 ```
 AIDE found differences between database and filesystem!!
 Added entries:
-f+++++++++++++++++: /etc/nginx/hola
+f+++++++++++++++++: /etc/nginx/hello
 ```
 
-### Automatización con Cron
+### Automation with Cron
 ```bash
 mkdir -p /var/log/aide
 crontab -e
 ```
 
-**Agregar la siguiente línea:**
+**Add the following line:**
 ```bash
 0 3 * * * /usr/bin/aide --config=/etc/aide/aide.conf --check > /var/log/aide/aide-$(date +\%F).log
 ```
-Esto ejecutará AIDE diariamente a las 3:00 AM.
-
+This will run AIDE daily at 3:00 AM.
 ---
 
 ## 4. Kernel Hardening
 
-### Configuración de seguridad del kernel
+### Kernel security configuration
 ```bash
 nano /etc/sysctl.d/kernel-security.conf
 ```
 
-**Contenido del archivo:**
+**File contents:**
 ```bash
 # Deshabilitar source routing
 net.ipv4.conf.all.accept_source_route = 0
@@ -191,68 +189,69 @@ net.ipv4.icmp_ignore_bogus_error_responses = 1
 net.ipv4.conf.all.log_martians = 1
 ```
 
-### Aplicar cambios
+### Apply changes
 ```bash
 sysctl -p /etc/sysctl.d/kernel-security.conf
-# o simplemente
+# or simply
 sysctl -p
 ```
 
 ---
 
-## 5. AppArmor - Control de Acceso Obligatorio
+## 5. AppArmor - Mandatory Access Control
 
-### Instalación
+### Installation
 ```bash
 apt install apparmor-utils apparmor-profiles apparmor-profiles-extra
 systemctl enable apparmor
 systemctl start apparmor
 ```
 
-### Verificar estado
+### Verify status
 ```bash
 aa-status
 ```
 
-### Ver perfiles disponibles
+### View available profiles
 ```bash
 ls /etc/apparmor.d/
 ```
 
-### Configuración de perfiles
+### Profile configuration
 
-**Poner servicios en modo complain (aprendizaje):**
+**Put services in complain mode (learning):**
 ```bash
 aa-complain /usr/sbin/php-fpm8.2
 aa-complain /usr/sbin/mariadbd
 aa-complain /usr/sbin/nginx
 ```
 
-**Generar perfil personalizado para un servicio:**
+**Generate custom profile for a service, only if the profile doesn't exist:**
 ```bash
 aa-genprof /usr/sbin/nginx
 ```
-Durante este proceso, usar el servicio de forma normal para que AppArmor aprenda su comportamiento y configure las reglas necesarias.
+During this process, use the service normally so that AppArmor learns its behavior and configures the necessary rules.
 
-**⚠️ Precaución:** No limitar demasiado las capacidades del servicio.
+**⚠️ Caution:** Do not overly restrict service capabilities.
 
-### Aplicar modo enforce al resto
+### Apply enforce mode to the rest
 ```bash
 aa-enforce /etc/apparmor.d/*
 ```
-### Aplicar modo complain si se ha sobreescrito (por lo visto muy probable)
+
+### Reapply complain mode if overwritten (apparently very likely)
 ```bash
 aa-complain /usr/sbin/php-fpm8.2
 aa-complain /usr/sbin/mariadbd
 aa-complain /usr/sbin/nginx
 ```
 
-### Estado final esperado
+### Expected final state
 ```bash
 aa-status
 ```
 
-**Ejemplo de configuración óptima:**
+**Optimal configuration example:**
 ```
 10 profiles are in complain mode.
    /usr/sbin/mariadbd
@@ -277,16 +276,19 @@ aa-status
 ```
 
 ---
-## 6. Software update mechanism
+
+## 6. Software Update Mechanism
+
 ### Install and configure unattended-upgrades
-This updates the necessary packages for security
+This updates necessary packages for security.
 
 ```bash
 apt install unattended-upgrades
 dpkg-reconfigure unattended-upgrades
 nano /etc/apt/apt.conf.d/50unattended-upgrades
 ```
-### Pegar lo siguiente
+
+### Paste the following
 ```bash
 Unattended-Upgrade::Origins-Pattern {
         // Solo actualizaciones de seguridad — totalmente seguro
@@ -297,21 +299,58 @@ Unattended-Upgrade::Origins-Pattern {
 Unattended-Upgrade::Automatic-Reboot "false";
 Unattended-Upgrade::Automatic-Reboot-WithUsers "false";
 ```
-### Automatizar el proceso
+
+### Automate the process
 ```bash
-crontab -e > 0 3 1 * * /usr/local/sbin/safe-upgrade.sh
-nano /usr/local/sbin/safe-upgrade.sh #Pegar el archivo
+crontab -e
+```
+Add:
+```bash
+0 3 1 * * /usr/local/sbin/safe-upgrade.sh
+```
+
+Create the script:
+```bash
+nano /usr/local/sbin/safe-upgrade.sh
+```
+
+Paste:
+```bash
+#!/bin/bash
+
+set -e
+
+# Log
+echo "===== Safe upgrade started: $(date) =====" >> /var/log/safe-upgrade.log
+
+# 1. Actualizar índices
+apt update -y >> /var/log/safe-upgrade.log 2>&1
+
+# 2. Realizar upgrade seguro (NO dist-upgrade)
+apt upgrade -y >> /var/log/safe-upgrade.log 2>&1
+
+# 3. Recargar servicios sin interrumpir conexiones
+systemctl reload nginx 2>/dev/null || true
+systemctl reload mariadb 2>/dev/null || true
+systemctl reload php*-fpm.service 2>/dev/null || true
+
+echo "===== Safe upgrade finished: $(date) =====" >> /var/log/safe-upgrade.log
+```
+
+Make executable:
+```bash
 chmod +x /usr/local/sbin/safe-upgrade.sh
 ```
-## Resumen
 
-Esta guía cubre los aspectos esenciales del hardening de seguridad en Linux:
+---
 
-1. **Control de usuarios:** Shells restringidos y gestión de privilegios
-2. **Prevención de filesystems:** Bloqueo de sistemas de archivos vulnerables
-3. **Integridad:** Monitoreo con AIDE para detectar cambios no autorizados
-4. **Kernel:** Protecciones a nivel de kernel contra ataques de red
-5. **AppArmor:** Control de acceso obligatorio para limitar el alcance de los procesos
-6. **Mecanismo de actualizacion de software:** Actualizacion de paquetes que pueden comprometer la seguridad
+## Summary
 
-Implementar estas medidas proporciona múltiples capas de seguridad (defensa en profundidad) para proteger el sistema contra diversos vectores de ataque.
+This guide covers essential aspects of Linux security hardening:
+
+1. **User control:** Restricted shells and privilege management
+2. **Filesystem prevention:** Blocking vulnerable file systems
+3. **Integrity:** Monitoring with AIDE to detect unauthorized changes
+4. **Kernel:** Kernel-level protections against network attacks
+5. **AppArmor:** Mandatory access control to limit process scope
+6. **Software update mechanism:** Automated security package updates

@@ -1,11 +1,11 @@
 ## 4. Kernel Hardening
 
-### Configuración de seguridad del kernel
+### Kernel security configuration
 ```bash
 nano /etc/sysctl.d/kernel-security.conf
 ```
 
-**Contenido del archivo:**
+**File contents:**
 ```bash
 # Deshabilitar source routing
 net.ipv4.conf.all.accept_source_route = 0
@@ -35,9 +35,9 @@ net.ipv4.icmp_ignore_bogus_error_responses = 1
 net.ipv4.conf.all.log_martians = 1
 ```
 
-### Aplicar cambios
+### Apply changes
 ```bash
 sysctl -p /etc/sysctl.d/kernel-security.conf
-# o simplemente
+# or simply
 sysctl -p
 ```

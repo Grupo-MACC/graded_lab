@@ -1,13 +1,15 @@
-## 6. Software update mechanism
+## 6. Software Update Mechanism
+
 ### Install and configure unattended-upgrades
-This updates the necessary packages for security
+This updates necessary packages for security.
 
 ```bash
 apt install unattended-upgrades
 dpkg-reconfigure unattended-upgrades
 nano /etc/apt/apt.conf.d/50unattended-upgrades
 ```
-### Pegar lo siguiente
+
+### Paste the following
 ```bash
 Unattended-Upgrade::Origins-Pattern {
         // Solo actualizaciones de seguridad — totalmente seguro
@@ -18,9 +20,21 @@ Unattended-Upgrade::Origins-Pattern {
 Unattended-Upgrade::Automatic-Reboot "false";
 Unattended-Upgrade::Automatic-Reboot-WithUsers "false";
 ```
-### Automatizar el proceso
+
+### Automate the process
 ```bash
-crontab -e > 0 3 1 * * /usr/local/sbin/safe-upgrade.sh
-nano /usr/local/sbin/safe-upgrade.sh #Pegar el archivo
+crontab -e
+```
+Add:
+```bash
+0 3 1 * * /usr/local/sbin/safe-upgrade.sh
+```
+
+Create the script:
+```bash
+nano /usr/local/sbin/safe-upgrade.sh
+```
+Make executable:
+```bash
 chmod +x /usr/local/sbin/safe-upgrade.sh
 ```

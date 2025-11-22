@@ -1,22 +1,22 @@
-## 3. Integridad de Archivos con AIDE
+## 3. File Integrity with AIDE
 
-### Instalación
+### Installation
 ```bash
 sudo apt install aide aide-common -y
 ```
 
-### Inicialización de la base de datos
+### Database initialization
 ```bash
 aideinit
 mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db
 ```
 
-### Configuración de archivos a monitorear
+### Configuring files to monitor
 ```bash
 nano /etc/aide/aide.conf
 ```
 
-**Ejemplo de configuración:**
+**Configuration example:**
 ```bash
 # Nginx
 /etc/nginx/                       Full
@@ -62,37 +62,37 @@ nano /etc/aide/aide.conf
 /var/lib/php/                     VarFile
 ```
 
-### Reinicializar y verificar
+### Reinitialize and verify
 ```bash
 aideinit
 mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db
 aide --config=/etc/aide/aide.conf --check
 ```
 
-### Prueba de AIDE
+### AIDE testing
 ```bash
-# Crear un archivo de prueba
-nano /etc/nginx/hola
+# Create a test file
+nano /etc/nginx/hello
 
-# Ejecutar verificación
+# Run verification
 aide --config=/etc/aide/aide.conf --check
 ```
 
-**Salida esperada:**
+**Expected output:**
 ```
 AIDE found differences between database and filesystem!!
 Added entries:
-f+++++++++++++++++: /etc/nginx/hola
+f+++++++++++++++++: /etc/nginx/hello
 ```
 
-### Automatización con Cron
+### Automation with Cron
 ```bash
 mkdir -p /var/log/aide
 crontab -e
 ```
 
-**Agregar la siguiente línea:**
+**Add the following line:**
 ```bash
 0 3 * * * /usr/bin/aide --config=/etc/aide/aide.conf --check > /var/log/aide/aide-$(date +\%F).log
 ```
-Esto ejecutará AIDE diariamente a las 3:00 AM.
+This will run AIDE daily at 3:00 AM.

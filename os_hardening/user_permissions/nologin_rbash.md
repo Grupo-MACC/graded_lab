@@ -1,27 +1,27 @@
-## 1. Configuración de Usuarios y Shells
+## 1. User and Shell Configuration
 
-### Restricción de Shells
-Todos los usuarios deben tener `nologin` como shell, excepto el usuario principal con acceso SSH.
+### Shell Restriction
+All users should have `nologin` as their shell, except for the main user with SSH access.
 
-**Verificación:**
+**Verification:**
 ```bash
 cat /etc/passwd
 ```
 
-**Cambiar shell a nologin:**
+**Change shell to nologin if needed:**
 ```bash
-usermod -s /usr/sbin/nologin usuario
+usermod -s /usr/sbin/nologin username
 ```
 
-**Configurar bash restringido para el usuario principal:**
+**Configure restricted bash for the main user:**
 ```bash
 usermod -s /bin/rbash user
 ```
-Esto obliga al usuario a escalar privilegios para realizar operaciones administrativas.
+This forces the user to escalate privileges to perform administrative operations.
 
-### Instalación y configuración de sudo
+### Installing and configuring sudo
 ```bash
 apt update && apt install -y sudo
 cat /etc/sudoers
 ```
-Asegurarse de que solo esté configurado root, excepto en casos excepcionales.
+Ensure that only root is configured, except in exceptional cases.
