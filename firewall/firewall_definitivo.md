@@ -1,6 +1,6 @@
 # Infrastructure and Network Security - Graded Lab
 
-## 2. SECURITY STRATEGY OVERVIEW
+## SECURITY STRATEGY OVERVIEW
 
 ### Defense in Depth Principle:
 We're implementing multiple layers of security:
@@ -23,8 +23,6 @@ We're implementing multiple layers of security:
 
 
 ## PHASE 1: IMPLEMENT BASIC FIREWALL RULES
-
-### Step 2.1: Configure AAA Server Firewall
 
 AAA
 
@@ -614,7 +612,7 @@ table inet webdb_filter {
 
 ## PHASE 2: ADVANCED PROTECTIONS
 
-### Step 2.1: Protection Against ARP Spoofing
+### Protection Against ARP Spoofing
 
 On each Debian server:
 ```bash
@@ -641,7 +639,7 @@ sudo arptables -A INPUT --source-mac ! <GATEWAY_MAC> --source-ip 192.168.1.1 -j 
 sudo arptables-save > /etc/arptables.rules
 ```
 
-### Step 4.2: DDoS Protection
+### DDoS extra Protection
 
 **Why critical for this topology?**
 - Web server is Internet-facing
@@ -795,10 +793,56 @@ maxretry = 3
 
 ---
 
+## PHASE 3: 802.1X Configuration on MikroTik routers
+
+```routeros
+ ip pool add name=Supplicant ranges=10.1.1.2-10.1.1.254
+ ip dhcp-server network add address=10.1.1.0/24 dns-server=10.1.1.1 gateway=10.1.1.1
+ ip dhcp-server add disabled=no address-pool=Supplicant authoritative=yes interface=ether4 name=Supplicant
+ radius add disabled=no address=192.168.1.1 secret=shared_secret service=dot1x
+ interface dot1x server add disabled=no accounting=yes auth-types=dot1x interface=ether4
 
 
+```
 
+## PHASE 4: MikroTik routers hardening:
 
+### 1. Change default users
+
+```routeros
+/user
+set admin password=pass
+add name=secadmin password=Newpass group=full
+remove admin
+```
+
+### 2. DISABLE UNNECESSARY SERVICES
+
+```routeros
+/ip service
+set telnet disabled=yes
+set ftp disabled=yes
+set www disabled=yes
+set api disabled=yes
+set api-ssl disabled=yes
+```
+
+### 3. DISABLE UNUSED INTERFACES
+
+```routeros
+/interface
+set ether6 disabled=yes
+set ether7 disabled=yes
+set ether8 disabled=yes
+```
+
+# 4. DISABLE WIRELESS WPS not for the hotspot
+
+```routeros
+/interface wireless
+set wlan1 wps-mode=disabled
+set wlan2 wps-mode=disabled
+```
 
 
 
