@@ -6,27 +6,27 @@ This document provides a unified overview of backup strategies, encryption polic
 
 ## 1. AAA Server (VM1)
 
-**Components:** FreeRADIUS, Firewall, Hardening, MariaDB
+**Components:** FreeRADIUS (en contenedor), Firewall, Hardening, MariaDB (en contenedor)
 
-### **Backup Method**
+### Backup Method
 
 * Weekly full backup (Mondays 02:00)
 * Daily incremental backup (02:00)
 * Monthly offline export (every 1st of the month)
 
-### **Storage**
+### Storage
 
 * Internal backup server using RAID and rsync
 * Monthly encrypted off-site disk (GFS rotation)
 
-### **Security**
+### Security
 
 * Encrypted backups (GPG per-file)
 * Transfers via SSH
 * Integrity checks, restoration tests
-* Minimum‑privilege accounts
+* Minimum-privilege accounts
 
-### **Recovery Procedure**
+### Recovery Procedure
 
 1. Select appropriate backup (daily or full)
 2. Decrypt using GPG
@@ -40,27 +40,27 @@ This document provides a unified overview of backup strategies, encryption polic
 
 **Components:** Nginx, PHP, Web App, Firewall, Hardening
 
-### **Backup Method**
+### Backup Method
 
 * Weekly full backup (Monday 02:00)
 * Daily differential backup (02:00)
 
-### **Storage**
+### Storage
 
 * Central remote backup server
 * Offline monthly backup (DVD/NAS)
 
-### **Security**
+### Security
 
 * Transfers via SSH/SCP
 * Encrypted storage (GPG)
 * Special protection for SSL certificates
 
-### **Recovery Procedure**
+### Recovery Procedure
 
 1. Choose backup based on incident impact
 2. Decrypt with GPG
-3. Restore configuration, code, and database
+3. Restore configuration and web code
 4. Restart services
 5. Validate application functionality and logs
 
@@ -70,23 +70,23 @@ This document provides a unified overview of backup strategies, encryption polic
 
 **Highly critical: root key, certificates, CRL**
 
-### **Backup Method**
+### Backup Method
 
 * Full backup after every certificate issuance/revocation
 * At minimum weekly
 
-### **Storage**
+### Storage
 
 * Encrypted internal server backup
 * Encrypted offline USB/drive stored in a safe (3-2-1 compliance)
 
-### **Security**
+### Security
 
-* AES‑256/GPG encryption
+* AES-256/GPG encryption
 * Network access extremely restricted
 * Strict physical security for offline copies
 
-### **Recovery Procedure**
+### Recovery Procedure
 
 1. Decrypt in isolated environment
 2. Restore private key, root certificate, PKI directory
@@ -100,39 +100,71 @@ This document provides a unified overview of backup strategies, encryption polic
 
 **Object:** Full running/startup configuration
 
-### **Backup Method**
+### Backup Method
 
 * Daily automatic full config backup (02:00)
 * Optionally triggered after each config change
 
-### **Storage**
+### Storage
 
 * Central repository structured by device and date
 * Local startup-config as emergency fallback
 
-### **Security**
+### Security
 
 * SCP/SFTP transfer
 * Config secrets obfuscated when possible
 * Daily checksum comparisons and alerts
 
-### **Recovery Procedure**
+### Recovery Procedure
 
 1. Select latest valid configuration
 2. Decrypt if required
 3. Restore via console/TFTP/SFTP
-4. Validate VLANs, routing, AAA, and logs
+4. Validate VLANs, routing/AAA, and logs
+
+---
+
+## 5. Web_DB Server (VM extra)
+
+**Components:** MariaDB (base de datos de la aplicación web)
+
+### Backup Method
+
+* Weekly full backup (Monday 02:00)
+* Daily incremental backup (02:00)
+* Monthly offline export de la base de datos
+
+### Storage
+
+* Internal backup server
+* Encrypted offline copies (USB/NAS)
+
+### Security
+
+* GPG encryption for dumps and data directory
+* SSH/SCP for remote transfers
+* Restricted DB and system accounts
+
+### Recovery Procedure
+
+1. Seleccionar copia completa + incrementales necesarias
+2. Desencriptar con GPG
+3. Restaurar configuración de MariaDB y directorio de datos
+4. Iniciar servicio MariaDB
+5. Validar integridad de las tablas y conectividad desde el servidor web
 
 ---
 
 # Backup Matrix
 
-| System         | Daily Backup (02:00)      | Weekly Backup (Mon 02:00) | Monthly Backup (Day 1 02:00) | Storage                                   | Encryption   |
-| -------------- | ------------------------- | ------------------------- | ---------------------------- | ----------------------------------------- | ------------ |
-| **AAA Server** | Incremental               | Full                      | Full (offline)               | Internal server + offline disk            | GPG          |
-| **Web Server** | Differential              | Full                      | Full (offline)               | Internal server + remote repo + offline   | GPG          |
-| **Routers**    | -                         | -                         | Full backup                  | Internal server + offline disk            | External GPG |
-| **CA**         | CRL + issued cert updates | Full PKI backup           | Full                         | Internal + highly secured offline storage | GPG          |
+| System          | Daily Backup (02:00)      | Weekly Backup (Mon 02:00) | Monthly Backup (Day 1 02:00) | Storage                                   | Encryption   |
+| --------------- | ------------------------- | ------------------------- | ---------------------------- | ----------------------------------------- | ------------ |
+| **AAA Server**  | Incremental               | Full                      | Full (offline)               | Internal server + offline disk            | GPG          |
+| **Web Server**  | Differential              | Full                      | Full (offline)               | Internal server + remote repo + offline   | GPG          |
+| **Web_DB**      | Incremental               | Full                      | Full (offline)               | Internal server + offline disk            | GPG          |
+| **Switches**    | -                         | -                         | Full backup                  | Internal server + offline disk            | External GPG |
+| **CA**          | CRL + issued cert updates | Full PKI backup           | Full                         | Internal + highly secured offline storage | GPG          |
 
 ---
 
@@ -140,11 +172,14 @@ This document provides a unified overview of backup strategies, encryption polic
 
 ## AAA Server
 
-### FreeRADIUS
+### FreeRADIUS (contenedor)
 
-* `/etc/freeradius/clients.conf`
-* `/etc/freeradius/mods-enabled/*`
-* `/etc/freeradius/sites-enabled/*`
+Configuración dentro de `~/containers/config/freeradius`:
+
+* `/home/user/containers/config/freeradius/clients.conf`
+* `/home/user/containers/config/freeradius/default`
+* `/home/user/containers/config/freeradius/inner-tunnel`
+* `/home/user/containers/config/freeradius/sql/` (directorio completo)
 
 ### Firewall
 
@@ -162,16 +197,16 @@ This document provides a unified overview of backup strategies, encryption polic
 * `/etc/ntpsec/ntp.conf`
 * `/usr/local/sbin/safe-upgrade.sh`
 
-### MariaDB
+### MariaDB (contenedor)
 
 **Config:**
 
-* `/etc/mysql/mariadb.conf.d/50-server.cnf`
-* `/etc/mysql/ssl/*`
+* `/home/user/containers/config/mariadb/custom.cnf`
+* `/home/user/containers/config/mariadb/schema.sql`
 
 **Data:**
 
-* `/mnt/mysql_data/` or `containers/data/mariadb/`
+* `/home/user/containers/data/mariadb/` (directorio completo)
 
 ---
 
@@ -204,10 +239,26 @@ This document provides a unified overview of backup strategies, encryption polic
 
 ---
 
-## Routers (Mikrotik)
+## Web_DB Server
 
-* `export file=router_backup.rsc`
-* `/user ssh-keys private/`
+### MariaDB
+
+**Config:**
+
+* `/etc/mysql/mariadb.conf.d/50-server.cnf`
+* Otros ficheros personalizados en `/etc/mysql/*.cnf`
+
+**Data:**
+
+* `/mnt/mysql_data/` (directorio completo montado para datos de MariaDB)
+
+---
+
+## Switches (Mikrotik)
+
+* Export de configuración: `export file=router_backup.rsc`
+* Claves SSH:
+  * `/user ssh-keys private/`
 
 ---
 
@@ -217,3 +268,12 @@ This document provides a unified overview of backup strategies, encryption polic
 * `ca-cert.pem`
 * `server-cert.pem`, `client-cert.pem`
 * CRL, serial files, `index.txt`
+
+---
+
+## Common files on all servers
+
+Se respaldan en todas las máquinas (AAA, Web, Web_DB, Backup, etc.):
+
+* `/etc/ntpsec/ntp.conf`
+* `/etc/ssh/sshd_config`
