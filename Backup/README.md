@@ -208,6 +208,10 @@ Configuration inside `~/containers/config/freeradius`:
 
 * `/home/user/containers/data/mariadb/` (entire directory)
 
+### Container design (Dockerfile)
+
+* `/home/user/containers/design/freeradius/Dockerfile`
+
 ---
 
 ## Web Server
