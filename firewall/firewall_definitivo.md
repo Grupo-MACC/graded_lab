@@ -17,6 +17,7 @@ We're implementing multiple layers of security:
 |-----------|------|------------------------|
 | **AAA Server** | Authentication hub | Compromise = network-wide access |
 | **Web Server** | Public-facing service | Receives external requests |
+| **Web Database Server** | Airpot web information storage | Receives Web Server requests |
 | **Backup Server** | Data storage | Contains sensitive backups |
 | **NAC Router** | Main gateway | Controls all traffic flow |
 | **NAC2 and Supplicant1 Router** | Redirect traffic | Exposed |
@@ -844,6 +845,7 @@ set ether8 disabled=yes
 set wlan1 wps-mode=disabled
 set wlan2 wps-mode=disabled
 ```
+
 
 
 
