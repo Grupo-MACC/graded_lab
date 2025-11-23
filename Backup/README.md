@@ -6,7 +6,7 @@ This document provides a unified overview of backup strategies, encryption polic
 
 ## 1. AAA Server (VM1)
 
-**Components:** FreeRADIUS (en contenedor), Firewall, Hardening, MariaDB (en contenedor)
+**Components:** FreeRADIUS (container), Firewall, Hardening, MariaDB (container)
 
 ### Backup Method
 
@@ -21,119 +21,119 @@ This document provides a unified overview of backup strategies, encryption polic
 
 ### Security
 
-* Encrypted backups (GPG per-file)
+* Encrypted backups (GPG per file)
 * Transfers via SSH
-* Integrity checks, restoration tests
-* Minimum-privilege accounts
+* Integrity checks and periodic restore tests
+* Least-privilege backup and restore accounts
 
 ### Recovery Procedure
 
-1. Select appropriate backup (daily or full)
-2. Decrypt using GPG
-3. Restore DB and config files
-4. Restart AAA services
-5. Validate logs, authentication, and system behavior
+1. Select the appropriate backup set (daily incremental or weekly full).
+2. Decrypt backup files using GPG.
+3. Restore database and configuration files.
+4. Restart AAA services (FreeRADIUS container, MariaDB container, firewall).
+5. Validate logs, RADIUS authentication, and overall system behavior.
 
 ---
 
 ## 2. Web Server (VM4)
 
-**Components:** Nginx, PHP, Web App, Firewall, Hardening
+**Components:** Nginx, PHP, Web Application, Firewall, Hardening
 
 ### Backup Method
 
-* Weekly full backup (Monday 02:00)
+* Weekly full backup (Mondays 02:00)
 * Daily differential backup (02:00)
 
 ### Storage
 
 * Central remote backup server
-* Offline monthly backup (DVD/NAS)
+* Offline monthly backup (DVD/NAS or USB)
 
 ### Security
 
 * Transfers via SSH/SCP
-* Encrypted storage (GPG)
-* Special protection for SSL certificates
+* Encrypted storage using GPG
+* Additional protection for SSL private keys and certificates
 
 ### Recovery Procedure
 
-1. Choose backup based on incident impact
-2. Decrypt with GPG
-3. Restore configuration and web code
-4. Restart services
-5. Validate application functionality and logs
+1. Choose the correct backup (depending on the incident date and impact).
+2. Decrypt backup with GPG.
+3. Restore configuration files and web application code.
+4. Restart Nginx, PHP-FPM and dependent services.
+5. Validate web application functionality, logs, and HTTPS connectivity.
 
 ---
 
 ## 3. Certification Authority (CA)
 
-**Highly critical: root key, certificates, CRL**
+**Highly critical assets: root key, certificates, CRL**
 
 ### Backup Method
 
-* Full backup after every certificate issuance/revocation
-* At minimum weekly
+* Full backup after every certificate issuance or revocation
+* At minimum once per week
 
 ### Storage
 
 * Encrypted internal server backup
-* Encrypted offline USB/drive stored in a safe (3-2-1 compliance)
+* Encrypted offline USB/drive stored in a physical safe (3-2-1 rule)
 
 ### Security
 
-* AES-256/GPG encryption
-* Network access extremely restricted
+* AES-256 / GPG encryption
+* Extremely restricted network access to the CA
 * Strict physical security for offline copies
 
 ### Recovery Procedure
 
-1. Decrypt in isolated environment
-2. Restore private key, root certificate, PKI directory
-3. Issue test certificate to validate
+1. Decrypt backup in an isolated environment.
+2. Restore private key, root certificate, and complete PKI directory structure.
+3. Issue a test certificate and verify CRL publication.
 
-**If CA is compromised → rebuild CA; do NOT restore.**
+**If the CA is compromised → rebuild the CA from scratch; do NOT restore from backup.**
 
 ---
 
 ## 4. Switches
 
-**Object:** Full running/startup configuration
+**Object:** Full running/startup configuration of each switch
 
 ### Backup Method
 
-* Daily automatic full config backup (02:00)
-* Optionally triggered after each config change
+* Daily automatic full configuration backup (02:00)
+* Optional on-demand backup after each configuration change
 
 ### Storage
 
-* Central repository structured by device and date
-* Local startup-config as emergency fallback
+* Central repository organized by device and date
+* Local startup-config on the switch as emergency fallback
 
 ### Security
 
-* SCP/SFTP transfer
-* Config secrets obfuscated when possible
-* Daily checksum comparisons and alerts
+* SCP/SFTP transfers
+* Configuration secrets obfuscated when possible
+* Daily checksum comparison and alerting on changes
 
 ### Recovery Procedure
 
-1. Select latest valid configuration
-2. Decrypt if required
-3. Restore via console/TFTP/SFTP
-4. Validate VLANs, routing/AAA, and logs
+1. Select the latest valid configuration file.
+2. Decrypt if required.
+3. Restore via console/TFTP/SFTP as appropriate.
+4. Validate VLANs, routing, AAA configuration, and logs.
 
 ---
 
-## 5. Web_DB Server (VM extra)
+## 5. Web_DB Server (extra VM)
 
-**Components:** MariaDB (base de datos de la aplicación web)
+**Components:** MariaDB (database for the web application)
 
 ### Backup Method
 
-* Weekly full backup (Monday 02:00)
+* Weekly full backup (Mondays 02:00)
 * Daily incremental backup (02:00)
-* Monthly offline export de la base de datos
+* Monthly offline export (logical dump of the application database)
 
 ### Storage
 
@@ -142,29 +142,29 @@ This document provides a unified overview of backup strategies, encryption polic
 
 ### Security
 
-* GPG encryption for dumps and data directory
-* SSH/SCP for remote transfers
-* Restricted DB and system accounts
+* GPG encryption for database dumps and data directory
+* SSH/SCP for all remote transfers
+* Restricted database and system accounts for backup operations
 
 ### Recovery Procedure
 
-1. Seleccionar copia completa + incrementales necesarias
-2. Desencriptar con GPG
-3. Restaurar configuración de MariaDB y directorio de datos
-4. Iniciar servicio MariaDB
-5. Validar integridad de las tablas y conectividad desde el servidor web
+1. Select the relevant full backup and required incrementals.
+2. Decrypt backup files with GPG.
+3. Restore MariaDB configuration and the data directory.
+4. Start MariaDB and check service status.
+5. Validate table integrity and connectivity from the Web Server.
 
 ---
 
 # Backup Matrix
 
-| System          | Daily Backup (02:00)      | Weekly Backup (Mon 02:00) | Monthly Backup (Day 1 02:00) | Storage                                   | Encryption   |
-| --------------- | ------------------------- | ------------------------- | ---------------------------- | ----------------------------------------- | ------------ |
-| **AAA Server**  | Incremental               | Full                      | Full (offline)               | Internal server + offline disk            | GPG          |
-| **Web Server**  | Differential              | Full                      | Full (offline)               | Internal server + remote repo + offline   | GPG          |
-| **Web_DB**      | Incremental               | Full                      | Full (offline)               | Internal server + offline disk            | GPG          |
-| **Switches**    | -                         | -                         | Full backup                  | Internal server + offline disk            | External GPG |
-| **CA**          | CRL + issued cert updates | Full PKI backup           | Full                         | Internal + highly secured offline storage | GPG          |
+| System          | Daily Backup (02:00)      | Weekly Backup (Mon 02:00) | Monthly Backup (Day 1 02:00) | Storage                                   | Encryption |
+| --------------- | ------------------------- | ------------------------- | ---------------------------- | ----------------------------------------- | ---------- |
+| **AAA Server**  | Incremental               | Full                      | Full (offline)               | Internal server + offline disk            | GPG        |
+| **Web Server**  | Differential              | Full                      | Full (offline)               | Internal server + remote repo + offline   | GPG        |
+| **Web_DB**      | Incremental               | Full                      | Full (offline)               | Internal server + offline disk            | GPG        |
+| **Switches**    | –                         | –                         | Full configuration backup    | Internal server + offline disk            | External GPG |
+| **CA**          | CRL + issued cert updates | Full PKI backup           | Full                         | Internal + highly secured offline storage | GPG        |
 
 ---
 
@@ -172,14 +172,14 @@ This document provides a unified overview of backup strategies, encryption polic
 
 ## AAA Server
 
-### FreeRADIUS (contenedor)
+### FreeRADIUS (container)
 
-Configuración dentro de `~/containers/config/freeradius`:
+Configuration inside `~/containers/config/freeradius`:
 
 * `/home/user/containers/config/freeradius/clients.conf`
 * `/home/user/containers/config/freeradius/default`
 * `/home/user/containers/config/freeradius/inner-tunnel`
-* `/home/user/containers/config/freeradius/sql/` (directorio completo)
+* `/home/user/containers/config/freeradius/sql/` (entire directory)
 
 ### Firewall
 
@@ -197,7 +197,7 @@ Configuración dentro de `~/containers/config/freeradius`:
 * `/etc/ntpsec/ntp.conf`
 * `/usr/local/sbin/safe-upgrade.sh`
 
-### MariaDB (contenedor)
+### MariaDB (container)
 
 **Config:**
 
@@ -206,7 +206,7 @@ Configuración dentro de `~/containers/config/freeradius`:
 
 **Data:**
 
-* `/home/user/containers/data/mariadb/` (directorio completo)
+* `/home/user/containers/data/mariadb/` (entire directory)
 
 ---
 
@@ -246,18 +246,18 @@ Configuración dentro de `~/containers/config/freeradius`:
 **Config:**
 
 * `/etc/mysql/mariadb.conf.d/50-server.cnf`
-* Otros ficheros personalizados en `/etc/mysql/*.cnf`
+* Any additional customized files in `/etc/mysql/*.cnf`
 
 **Data:**
 
-* `/mnt/mysql_data/` (directorio completo montado para datos de MariaDB)
+* `/mnt/mysql_data/` (entire directory used for MariaDB data)
 
 ---
 
 ## Switches (Mikrotik)
 
-* Export de configuración: `export file=router_backup.rsc`
-* Claves SSH:
+* Configuration export: `export file=router_backup.rsc`
+* SSH keys:
   * `/user ssh-keys private/`
 
 ---
@@ -273,7 +273,7 @@ Configuración dentro de `~/containers/config/freeradius`:
 
 ## Common files on all servers
 
-Se respaldan en todas las máquinas (AAA, Web, Web_DB, Backup, etc.):
+These files are backed up on all relevant machines (AAA, Web, Web_DB, Backup server, etc.):
 
 * `/etc/ntpsec/ntp.conf`
 * `/etc/ssh/sshd_config`
