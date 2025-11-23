@@ -831,18 +831,20 @@ set api-ssl disabled=yes
 
 ```routeros
 /interface
+set ether5 disabled=yes
 set ether6 disabled=yes
 set ether7 disabled=yes
 set ether8 disabled=yes
 ```
 
-# 4. DISABLE WIRELESS WPS not for the hotspot
+### 4. DISABLE WIRELESS WPS not for the hotspot
 
 ```routeros
 /interface wireless
 set wlan1 wps-mode=disabled
 set wlan2 wps-mode=disabled
 ```
+
 
 
 
