@@ -281,3 +281,28 @@ These files are backed up on all relevant machines (AAA, Web, Web_DB, Backup ser
 
 * `/etc/ntpsec/ntp.conf`
 * `/etc/ssh/sshd_config`
+-----
+# SCRIPTS/BACKUPS/BACKUPS_FULL.SH
+#!/bin/bash
+
+# === Carpetas de destino ===
+FECHA="$(date +%F)"
+DEST="/backups/full/${FECHA3}"
+mkdir -p "$DEST"
+
+# === Bases de datos ===
+DB_USER="radius"
+DB_PASS="radpass"
+DB_NAME="radius"
+
+echo "[*] Sacando dump de la base de datos..."
+docker exec mariadb mariadb-dump -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" > "${DEST}/radius.sql"
+
+# === Configuraciones importantes ===
+echo "[*] Copiando configuraciones..."
+rsync -a /etc/ "${DEST}/etc/"
+rsync -a /home/user/containers/config/freeradius/ "${DEST}/freeradius/"
+rsync -a /etc/mysql/ "${DEST}/mysql/"
+rsync -a /var/log/ "${DEST}/logs/"
+
+echo "[OK] Backup FULL completado en ${DEST3}"
